@@ -1,4 +1,4 @@
-import React, { useState, useContext, useEffect } from 'react';
+import React, { useState, useContext, useEffect, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 import axiosClient from '../api/axiosClient';
@@ -12,6 +12,9 @@ export default function Profile() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [avatarPreview, setAvatarPreview] = useState(null);
+  
+  // 🚨 NEW: Guard to prevent fetching and resetting data on every keystroke
+  const hasFetchedRef = useRef(false);
 
   // Fetch fresh user data on mount
   useEffect(() => {
@@ -20,6 +23,10 @@ export default function Profile() {
         navigate('/login');
         return;
       }
+
+      // If we already fetched the data once, don't fetch it again (prevents input reverting)
+      if (hasFetchedRef.current) return;
+      hasFetchedRef.current = true;
 
       const userId = user._id || user.id;
 

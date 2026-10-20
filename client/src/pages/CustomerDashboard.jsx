@@ -14,7 +14,7 @@ export default function CustomerDashboard() {
   const [downloadingId, setDownloadingId] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
 
-  // 🚨 Rating Modal States
+  // Rating Modal States
   const [isRatingModalOpen, setIsRatingModalOpen] = useState(false);
   const [selectedBookingForRating, setSelectedBookingForRating] = useState(null);
   const [ratingValue, setRatingValue] = useState(5);
@@ -161,7 +161,7 @@ export default function CustomerDashboard() {
     }
   };
 
-  // 🚨 Rating Functions
+  // Rating Functions
   const openRatingModal = (booking) => {
     setSelectedBookingForRating(booking);
     setRatingValue(5);
@@ -181,12 +181,16 @@ export default function CustomerDashboard() {
       });
       toast.success('Thank you for your feedback!');
       setIsRatingModalOpen(false);
-      fetchBookings(); // Refresh to show new rating
+      fetchBookings();
     } catch (error) {
       toast.error(error.response?.data?.message || 'Failed to submit rating');
     } finally {
       setIsSubmittingRating(false);
     }
+  };
+
+  const handleChatRedirect = () => {
+    navigate('/chat');
   };
 
   const getStatusCount = (status) => {
@@ -201,7 +205,6 @@ export default function CustomerDashboard() {
   const filteredBookings = useMemo(() => {
     let filtered = bookings;
 
-    // Tab Filter
     if (activeTab === 'Upcoming')
       filtered = filtered.filter((b) => b.status === 'Pending' || b.status === 'Confirmed');
     else if (activeTab === 'In Progress')
@@ -211,7 +214,6 @@ export default function CustomerDashboard() {
     else if (activeTab === 'Cancelled')
       filtered = filtered.filter((b) => b.status === 'Cancelled' || b.status === 'Rejected');
 
-    // Search Filter
     if (searchTerm) {
       const lowerSearch = searchTerm.toLowerCase();
       filtered = filtered.filter(
@@ -240,7 +242,7 @@ export default function CustomerDashboard() {
   return (
     <div className="min-h-screen bg-zinc-950 font-sans text-zinc-50 selection:bg-red-600 selection:text-white">
       
-      {/* 🚨 RATING MODAL */}
+      {/* RATING MODAL */}
       {isRatingModalOpen && selectedBookingForRating && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-[fadeIn_0.2s_ease-out]">
           <div className="bg-zinc-900 border border-zinc-700 rounded-2xl w-full max-w-md overflow-hidden shadow-2xl">
@@ -516,7 +518,6 @@ export default function CustomerDashboard() {
                             </button>
                           )}
                           
-                          {/* REPLACED RECORD BUTTON WITH DOWNLOAD REPORT STYLE */}
                           <button
                             onClick={() => handleDownloadRecord(booking)}
                             disabled={downloadingId === booking._id}
@@ -554,7 +555,38 @@ export default function CustomerDashboard() {
           )}
         </div>
       </main>
-      
+
+      {/* MODERN FLOATING CHAT BUTTON */}
+      <button
+        onClick={handleChatRedirect}
+        className="fixed bottom-6 right-6 z-40 group"
+        aria-label="Chat with support"
+        title="Chat with support"
+      >
+        <span className="absolute inset-0 rounded-full bg-red-600/30 animate-ping opacity-75"></span>
+        <span className="absolute inset-0 rounded-full bg-red-600/20 animate-pulse"></span>
+
+        <span className="relative flex items-center gap-2 bg-gradient-to-br from-red-500 via-red-600 to-red-700 hover:from-red-600 hover:via-red-700 hover:to-red-800 text-white pl-3 pr-4 py-3 rounded-full shadow-2xl shadow-red-600/40 hover:shadow-red-600/60 transition-all duration-300 hover:scale-105">
+          <span className="relative w-8 h-8 rounded-full bg-white/15 backdrop-blur-sm flex items-center justify-center flex-shrink-0">
+            <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M12 3C6.477 3 2 6.94 2 11.79c0 2.7 1.44 5.11 3.72 6.74-.07.83-.33 2.25-1.05 3.15-.09.12-.01.3.14.31 1.18.08 2.87-.53 4.14-1.4.96.29 2 .45 3.05.45 5.523 0 10-3.94 10-8.79S17.523 3 12 3z" />
+            </svg>
+            <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-400 border-2 border-red-600"></span>
+          </span>
+
+          <span className="text-xs font-black tracking-widest uppercase whitespace-nowrap">
+            Chat
+          </span>
+
+          <span className="absolute inset-0 rounded-full bg-gradient-to-r from-transparent via-white/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"></span>
+        </span>
+
+        <span className="hidden md:block absolute right-full mr-4 top-1/2 -translate-y-1/2 bg-zinc-900 text-white text-xs font-bold px-3 py-2 rounded-lg whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none shadow-xl border border-zinc-800">
+          Chat with Support
+          <span className="absolute left-full top-1/2 -translate-y-1/2 border-8 border-transparent border-l-zinc-900"></span>
+        </span>
+      </button>
+
       {/* CSS to hide scrollbar for tabs */}
       <style dangerouslySetInnerHTML={{__html: `
         .hide-scrollbar::-webkit-scrollbar {
