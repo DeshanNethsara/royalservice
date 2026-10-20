@@ -20,11 +20,13 @@ const httpServer = createServer(app);
 // =========================
 // CORS CONFIGURATION
 // =========================
-// Allow localhost for dev, and the live Vercel URL for production
+// Allow localhost for dev, and the live domain for production
 const allowedOrigins = [
   'http://localhost:5173',
-  process.env.FRONTEND_URL, // e.g., 'https://royal-service.vercel.app'
-].filter(Boolean); // Removes undefined if FRONTEND_URL isn't set
+  'https://royalservice.tech',
+  'https://www.royalservice.tech',
+  process.env.CLIENT_URL // Pulls from your Render environment variable
+].filter(Boolean); 
 
 // =========================
 // SOCKET.IO
