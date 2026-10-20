@@ -33,7 +33,6 @@ export default function CustomerDashboard() {
     try {
       setLoading(true);
       const response = await axiosClient.get('/bookings/my-bookings');
-      // Sort latest first
       const sorted = response.data.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
       setBookings(sorted);
     } catch (error) {
@@ -108,8 +107,7 @@ export default function CustomerDashboard() {
       }
     } catch (error) {
       console.error('Error cancelling booking:', error);
-      const errorMessage =
-        error.response?.data?.message || 'Failed to cancel booking.';
+      const errorMessage = error.response?.data?.message || 'Failed to cancel booking.';
       toast.error(errorMessage);
       fetchBookings();
     } finally {
@@ -144,10 +142,7 @@ export default function CustomerDashboard() {
       const url = window.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement('a');
       link.href = url;
-      link.setAttribute(
-        'download',
-        `Service_Record_${booking.booking_ref}.pdf`
-      );
+      link.setAttribute('download', `Service_Record_${booking.booking_ref}.pdf`);
       document.body.appendChild(link);
       link.click();
       link.parentNode.removeChild(link);
@@ -161,7 +156,6 @@ export default function CustomerDashboard() {
     }
   };
 
-  // Rating Functions
   const openRatingModal = (booking) => {
     setSelectedBookingForRating(booking);
     setRatingValue(5);
@@ -195,9 +189,7 @@ export default function CustomerDashboard() {
 
   const getStatusCount = (status) => {
     if (status === 'Upcoming') {
-      return bookings.filter(
-        (b) => b.status === 'Pending' || b.status === 'Confirmed'
-      ).length;
+      return bookings.filter((b) => b.status === 'Pending' || b.status === 'Confirmed').length;
     }
     return bookings.filter((b) => b.status === status).length;
   };
@@ -311,9 +303,14 @@ export default function CustomerDashboard() {
       <header className="sticky top-0 z-50 bg-zinc-950/80 backdrop-blur-xl border-b border-zinc-800 shadow-2xl">
         <div className="max-w-7xl mx-auto px-4 md:px-6 py-4 flex justify-between items-center">
           <Link to="/" className="flex items-center gap-3 group cursor-pointer">
-            <div className="w-10 h-10 bg-gradient-to-br from-red-600 to-red-700 rounded-lg flex items-center justify-center shadow-lg shadow-red-600/20">
-              <span className="text-white font-extrabold text-xl tracking-tighter">R</span>
-            </div>
+            
+            {/* 🚨 LOGO IMAGE ADDED HERE */}
+            <img 
+              src="/logo.png" 
+              alt="Royal Service Center Logo" 
+              className="w-10 h-10 object-contain rounded-lg shadow-lg" 
+            />
+            
             <h1 className="text-xl font-bold text-white tracking-widest uppercase hidden md:block">
               Royal Service
             </h1>

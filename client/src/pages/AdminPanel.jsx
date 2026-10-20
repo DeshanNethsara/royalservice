@@ -54,7 +54,7 @@ export default function AdminPanel() {
       setServices(servicesRes.data);
       setUsers(usersRes.data);
       
-      // 🚨 SORT LATEST BOOKINGS FIRST (using created_at)
+      // SORT LATEST BOOKINGS FIRST (using created_at)
       const sortedBookings = bookingsRes.data.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
       setBookings(sortedBookings);
       
@@ -73,7 +73,7 @@ export default function AdminPanel() {
   const refreshBookings = useCallback(async () => {
     try {
       const res = await axiosClient.get('/bookings/all');
-      // 🚨 SORT LATEST BOOKINGS FIRST
+      // SORT LATEST BOOKINGS FIRST
       const sortedBookings = res.data.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
       setBookings(sortedBookings);
     } catch (error) {
@@ -405,16 +405,19 @@ export default function AdminPanel() {
       {/* Mobile Header */}
       <div className="md:hidden bg-zinc-900 p-4 flex items-center justify-between sticky top-0 z-30 border-b border-zinc-800">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-gradient-to-br from-red-600 to-red-700 rounded-lg flex items-center justify-center shadow-lg shadow-red-600/20">
-            <span className="text-white font-extrabold">R</span>
-          </div>
+          {/* 🚨 LOGO ADDED HERE */}
+          <img 
+            src="/logo.png" 
+            alt="Royal Service Center Logo" 
+            className="w-10 h-10 object-contain rounded-lg shadow-lg" 
+          />
           <h2 className="text-lg font-black text-white uppercase tracking-widest">
             ADMIN
           </h2>
         </div>
         <button
           onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-          className="text-zinc-400 hover:text-red-500"
+          className="text-zinc-400 hover:text-red-500 p-2"
         >
           <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             {isSidebarOpen ? (
@@ -426,71 +429,85 @@ export default function AdminPanel() {
         </button>
       </div>
 
+      {/* Mobile Sidebar Backdrop */}
+      {isSidebarOpen && (
+        <div 
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-30 md:hidden"
+          onClick={() => setIsSidebarOpen(false)}
+        ></div>
+      )}
+
       {/* Sidebar */}
       <div
         className={`${
-          isSidebarOpen ? 'block' : 'hidden'
-        } md:block w-full md:w-64 bg-zinc-900 border-r border-zinc-800 p-6 z-20 fixed md:sticky top-0 h-screen`}
+          isSidebarOpen ? 'flex' : 'hidden'
+        } md:flex flex-col w-64 bg-zinc-900 border-r border-zinc-800 z-40 fixed md:sticky top-0 h-screen overflow-y-auto shrink-0 transition-transform duration-300`}
       >
-        <div className="hidden md:flex items-center gap-3 mb-8 pb-6 border-b border-zinc-800">
-          <div className="w-10 h-10 bg-gradient-to-br from-red-600 to-red-700 rounded-lg flex items-center justify-center shadow-lg shadow-red-600/20">
-            <span className="text-white font-extrabold">R</span>
+        <div className="p-6 pb-4">
+          <div className="hidden md:flex items-center gap-3 mb-6 border-b border-zinc-800 pb-6">
+            {/* 🚨 LOGO ADDED HERE */}
+            <img 
+              src="/logo.png" 
+              alt="Royal Service Center Logo" 
+              className="w-10 h-10 object-contain rounded-lg shadow-lg" 
+            />
+            <h2 className="text-lg font-black text-white uppercase tracking-widest">
+              Admin Panel
+            </h2>
           </div>
-          <h2 className="text-lg font-black text-white uppercase tracking-widest">
-            Admin Panel
-          </h2>
+
+          <nav className="space-y-2">
+            <button
+              onClick={() => {
+                setActiveTab('bookings');
+                setIsSidebarOpen(false);
+                setSearchTerm('');
+                setStatusFilter('all');
+              }}
+              className={`w-full text-left px-4 py-3 rounded-xl font-bold text-sm transition-all ${
+                activeTab === 'bookings'
+                  ? 'bg-red-600 text-white shadow-lg shadow-red-600/25'
+                  : 'text-zinc-400 hover:bg-zinc-800 hover:text-white'
+              }`}
+            >
+              📋 Bookings
+            </button>
+            <button
+              onClick={() => {
+                setActiveTab('services');
+                setIsSidebarOpen(false);
+                setSearchTerm('');
+              }}
+              className={`w-full text-left px-4 py-3 rounded-xl font-bold text-sm transition-all ${
+                activeTab === 'services'
+                  ? 'bg-red-600 text-white shadow-lg shadow-red-600/25'
+                  : 'text-zinc-400 hover:bg-zinc-800 hover:text-white'
+              }`}
+            >
+              🔧 Services
+            </button>
+            <button
+              onClick={() => {
+                setActiveTab('users');
+                setIsSidebarOpen(false);
+                setSearchTerm('');
+              }}
+              className={`w-full text-left px-4 py-3 rounded-xl font-bold text-sm transition-all ${
+                activeTab === 'users'
+                  ? 'bg-red-600 text-white shadow-lg shadow-red-600/25'
+                  : 'text-zinc-400 hover:bg-zinc-800 hover:text-white'
+              }`}
+            >
+              👥 Users
+            </button>
+          </nav>
         </div>
 
-        <nav className="space-y-2">
-          <button
-            onClick={() => {
-              setActiveTab('bookings');
-              setIsSidebarOpen(false);
-              setSearchTerm('');
-              setStatusFilter('all');
-            }}
-            className={`w-full text-left px-4 py-3 rounded-xl font-bold text-sm transition-all ${
-              activeTab === 'bookings'
-                ? 'bg-red-600 text-white shadow-lg shadow-red-600/25'
-                : 'text-zinc-400 hover:bg-zinc-800 hover:text-white'
-            }`}
-          >
-            📋 Bookings
-          </button>
-          <button
-            onClick={() => {
-              setActiveTab('services');
-              setIsSidebarOpen(false);
-              setSearchTerm('');
-            }}
-            className={`w-full text-left px-4 py-3 rounded-xl font-bold text-sm transition-all ${
-              activeTab === 'services'
-                ? 'bg-red-600 text-white shadow-lg shadow-red-600/25'
-                : 'text-zinc-400 hover:bg-zinc-800 hover:text-white'
-            }`}
-          >
-            🔧 Services
-          </button>
-          <button
-            onClick={() => {
-              setActiveTab('users');
-              setIsSidebarOpen(false);
-              setSearchTerm('');
-            }}
-            className={`w-full text-left px-4 py-3 rounded-xl font-bold text-sm transition-all ${
-              activeTab === 'users'
-                ? 'bg-red-600 text-white shadow-lg shadow-red-600/25'
-                : 'text-zinc-400 hover:bg-zinc-800 hover:text-white'
-            }`}
-          >
-            👥 Users
-          </button>
-        </nav>
-
-        <div className="absolute bottom-6 left-6 right-6 space-y-2">
+        {/* 🚨 Sidebar Footer pushed to the bottom securely */}
+        <div className="mt-auto p-6 pt-4 border-t border-zinc-800/50 space-y-2">
           <button
             onClick={() => navigate('/')}
-            className="w-full text-left px-4 py-3 rounded-xl font-bold text-sm text-zinc-400 hover:bg-zinc-800 hover:text-white transition-all"
+            className="w-full text-left px-4 py-3 rounded-xl font-bold text-sm text-zinc-400 hover:bg-zinc-800 hover:text-white transition-all flex items-center gap-2"
           >
             ← Home
           </button>
@@ -504,7 +521,7 @@ export default function AdminPanel() {
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 p-4 md:p-6 overflow-y-auto h-screen">
+      <div className="flex-1 p-4 md:p-6 overflow-y-auto h-[calc(100vh-73px)] md:h-screen">
         {/* Search Bar */}
         <div className="mb-6 flex flex-col md:flex-row gap-4">
           <div className="flex-1 relative">
@@ -995,31 +1012,24 @@ export default function AdminPanel() {
         aria-label="Chat with support"
         title="Chat with support"
       >
-        {/* Animated ping ring behind button */}
         <span className="absolute inset-0 rounded-full bg-red-600/30 animate-ping opacity-75"></span>
         <span className="absolute inset-0 rounded-full bg-red-600/20 animate-pulse"></span>
 
-        {/* Main button */}
         <span className="relative flex items-center gap-2 bg-gradient-to-br from-red-500 via-red-600 to-red-700 hover:from-red-600 hover:via-red-700 hover:to-red-800 text-white pl-3 pr-4 py-3 rounded-full shadow-2xl shadow-red-600/40 hover:shadow-red-600/60 transition-all duration-300 hover:scale-105">
-          {/* Chat bubble icon */}
           <span className="relative w-8 h-8 rounded-full bg-white/15 backdrop-blur-sm flex items-center justify-center flex-shrink-0">
             <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 24 24">
               <path d="M12 3C6.477 3 2 6.94 2 11.79c0 2.7 1.44 5.11 3.72 6.74-.07.83-.33 2.25-1.05 3.15-.09.12-.01.3.14.31 1.18.08 2.87-.53 4.14-1.4.96.29 2 .45 3.05.45 5.523 0 10-3.94 10-8.79S17.523 3 12 3z" />
             </svg>
-            {/* Small "online" dot on icon */}
             <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-400 border-2 border-red-600"></span>
           </span>
 
-          {/* Label */}
           <span className="text-xs font-black tracking-widest uppercase whitespace-nowrap">
             Chat
           </span>
 
-          {/* Hover shine effect */}
           <span className="absolute inset-0 rounded-full bg-gradient-to-r from-transparent via-white/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"></span>
         </span>
 
-        {/* Tooltip on hover (desktop) */}
         <span className="hidden md:block absolute right-full mr-4 top-1/2 -translate-y-1/2 bg-zinc-900 text-white text-xs font-bold px-3 py-2 rounded-lg whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none shadow-xl border border-zinc-800">
           Chat with Support
           <span className="absolute left-full top-1/2 -translate-y-1/2 border-8 border-transparent border-l-zinc-900"></span>
