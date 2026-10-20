@@ -291,8 +291,9 @@ export default function Homepage() {
       {/* Header */}
       <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-xl border-b border-zinc-200 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 md:px-6 py-3 md:py-4 flex justify-between items-center">
+          
           <div
-            className="flex items-center gap-3 cursor-pointer"
+            className="flex items-center gap-2 md:gap-3 cursor-pointer"
             onClick={() => navigate('/')}
             role="button"
             aria-label="Go to homepage"
@@ -300,13 +301,14 @@ export default function Homepage() {
             <img 
               src="/logo.png" 
               alt="Royal Service Center Logo" 
-              className="w-10 h-10 md:w-12 md:h-12 object-contain rounded-lg" 
+              className="w-9 h-9 md:w-12 md:h-12 object-contain rounded-lg" 
             />
-            <div className="hidden sm:block">
-              <h1 className="text-xl font-black text-zinc-900 tracking-tight leading-none">
+            {/* 🚨 FIXED: Removed 'hidden sm:block' so text shows on mobile */}
+            <div className="block">
+              <h1 className="text-lg md:text-xl font-black text-zinc-900 tracking-tight leading-none">
                 ROYAL
               </h1>
-              <span className="text-xs font-bold text-red-600 tracking-widest">
+              <span className="text-[10px] md:text-xs font-bold text-red-600 tracking-widest">
                 SERVICE CENTER
               </span>
             </div>
@@ -459,7 +461,6 @@ export default function Homepage() {
                     }`}
                   >
                     <div className="w-16 md:w-20 h-1 bg-red-600 mb-4 md:mb-6"></div>
-                    {/* Adjusted text size for mobile */}
                     <h2 className="text-4xl md:text-7xl font-black text-white mb-3 md:mb-4 leading-tight tracking-tight uppercase">
                       {slide.title}
                     </h2>
