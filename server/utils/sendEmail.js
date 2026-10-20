@@ -1,26 +1,39 @@
-import nodemailer from 'nodemailer';
-
 const sendEmail = async (options) => {
-  const transporter = nodemailer.createTransport({
-    host: process.env.EMAIL_HOST,
-    port: process.env.EMAIL_PORT,
-    secure: false,
-    auth: {
-      user: process.env.EMAIL_USER,
-      pass: process.env.EMAIL_PASS,
-    },
-  });
+  try {
+    const response = await fetch('https://api.brevo.com/v3/smtp/email', {
+      method: 'POST',
+      headers: {
+        'accept': 'application/json',
+        'api-key': process.env.BREVO_API_KEY, // We will add this to Render next
+        'content-type': 'application/json'
+      },
+      body: JSON.stringify({
+        sender: { 
+          name: 'Royal Service Center', 
+          email: 'deshanspotify@gmail.com' 
+        },
+        to: [{ email: options.email }],
+        subject: options.subject,
+        htmlContent: options.html,
+        // Handle PDF attachments for the Service Record
+        attachment: options.attachments ? options.attachments.map(a => ({
+          content: a.content.toString('base64'),
+          name: a.filename
+        })) : undefined
+      })
+    });
 
-  const mailOptions = {
-    from: process.env.EMAIL_FROM,
-    to: options.email,
-    subject: options.subject,
-    html: options.html,
-    // 🚨 NEW: Pass attachments if they exist, otherwise use an empty array
-    attachments: options.attachments || [],
-  };
+    if (!response.ok) {
+      const errorData = await response.json();
+      console.error('Brevo API Error:', errorData);
+      throw new Error(errorData.message || 'Email failed to send');
+    }
 
-  await transporter.sendMail(mailOptions);
+    console.log('Email sent successfully via Brevo API!');
+  } catch (error) {
+    console.error('Email sending error:', error);
+    throw error;
+  }
 };
 
 export default sendEmail;
