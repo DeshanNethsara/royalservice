@@ -8,6 +8,13 @@ import { v2 as cloudinary } from 'cloudinary';
 import { CloudinaryStorage } from 'multer-storage-cloudinary';
 import sendEmail from '../utils/sendEmail.js';
 
+// 🚨 NEW: Imports for finding the logo file path
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
 // ==========================================================
 // CLOUDINARY CONFIGURATION
 // ==========================================================
@@ -96,8 +103,12 @@ const buildServiceRecordPDF = (booking, report, payment) => {
 
     doc.rect(0, 0, PAGE_W, 110).fill(BRAND_DARK);
     doc.rect(0, 110, PAGE_W, 4).fill(BRAND_RED);
-    doc.circle(M + 25, 55, 25).fill(BRAND_RED);
-    doc.fillColor('#ffffff').fontSize(28).font('Helvetica-Bold').text('R', M + 13, 40, { width: 50, align: 'center' });
+    
+    // 🚨 REPLACED CIRCLE 'R' WITH ACTUAL LOGO IMAGE
+    // Assumes logo.png is saved in the same folder as this controller file
+    const logoPath = path.join(__dirname, 'logo.png');
+    doc.image(logoPath, M, 30, { width: 50, height: 50 });
+    
     doc.fillColor('#ffffff').fontSize(22).font('Helvetica-Bold').text('ROYAL SERVICE CENTER', M + 65, 32);
     doc.fillColor('#a1a1aa').fontSize(9).font('Helvetica').text('PREMIUM AUTOMOTIVE CARE', M + 65, 62, { characterSpacing: 1.5 });
     doc.fillColor('#a1a1aa').fontSize(8).font('Helvetica').text('OFFICIAL DOCUMENT', PAGE_W - M - 180, 32, { width: 180, align: 'right' });

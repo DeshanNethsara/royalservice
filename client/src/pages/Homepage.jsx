@@ -83,7 +83,6 @@ export default function Homepage() {
       title: 'WASH & GROOMING',
       subtitle: 'Professional care for that showroom finish',
       cta: 'Schedule Service',
-      // Fresh, modern, high-res Unsplash image of a dark car getting a premium foam wash
       image: 'https://images.unsplash.com/photo-1580273916550-e323be2ae537?q=80&w=2940&auto=format&fit=crop',
       overlay: 'from-zinc-950/95 via-zinc-900/80 to-zinc-950/60',
     },
@@ -308,9 +307,12 @@ export default function Homepage() {
             role="button"
             aria-label="Go to homepage"
           >
-            <div className="w-12 h-12 bg-gradient-to-br from-red-600 to-red-700 rounded-lg flex items-center justify-center shadow-lg">
-              <span className="text-white font-black text-2xl tracking-tighter">R</span>
-            </div>
+            {/* LOGO IMAGE REPLACED HERE */}
+            <img 
+              src="/logo.png" 
+              alt="Royal Service Center Logo" 
+              className="w-12 h-12 object-contain rounded-lg" 
+            />
             <div className="hidden sm:block">
               <h1 className="text-xl font-black text-zinc-900 tracking-tight leading-none">
                 ROYAL
@@ -967,9 +969,12 @@ export default function Homepage() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-12 mb-12">
             <div>
               <div className="flex items-center gap-2 mb-6">
-                <div className="w-12 h-12 bg-red-600 rounded-lg flex items-center justify-center">
-                  <span className="text-white font-black text-2xl">R</span>
-                </div>
+                {/* LOGO IMAGE REPLACED HERE TOO */}
+                <img 
+                  src="/logo.png" 
+                  alt="Royal Service Center Logo" 
+                  className="w-12 h-12 object-contain rounded-lg" 
+                />
                 <div>
                   <h4 className="text-lg font-black text-white tracking-tight leading-none">ROYAL</h4>
                   <span className="text-xs font-bold text-red-500 tracking-widest">SERVICE CENTER</span>
