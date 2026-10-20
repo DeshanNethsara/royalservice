@@ -7,7 +7,7 @@ import toast from 'react-hot-toast';
 export default function Login() {
   const [isRegister, setIsRegister] = useState(false);
   
-  // 🚨 State for password reset flow
+  // State for password reset flow
   const [isForgotPassword, setIsForgotPassword] = useState(false);
   const [resetToken, setResetToken] = useState(null);
 
@@ -67,7 +67,7 @@ export default function Login() {
     }
 
     // 3. Handle Login / Register
-    const loadingToast = toast.loading(isRegister ? 'Creating your account...' : 'Authenticating credentials...');
+    const loadingToast = toast.loading(isRegister ? 'Creating your account...' : 'Signing you in...');
     try {
       const endpoint = isRegister ? '/auth/register' : '/auth/login';
       const payload = isRegister ? formData : { email: formData.email, password: formData.password };
@@ -79,7 +79,7 @@ export default function Login() {
 
       login(user, token);
       toast.dismiss(loadingToast);
-      toast.success(isRegister ? 'Account registered successfully!' : `Welcome back, ${user.name || 'Commander'}!`);
+      toast.success(isRegister ? 'Account created successfully!' : `Welcome back, ${user.name?.split(' ')[0] || 'there'}!`);
 
       if (userRole === 'admin') navigate('/admin');
       else if (userRole === 'staff') navigate('/staff');
@@ -100,14 +100,14 @@ export default function Login() {
   };
 
   // Determine titles based on current state
-  let title = 'SECURE LOGIN';
-  let subtitle = 'Enter your credentials to continue';
+  let title = 'WELCOME BACK';
+  let subtitle = 'Sign in to your account to continue';
   
   if (isRegister) {
-    title = 'INITIATE ACCESS';
-    subtitle = 'Create your Royal Service account';
+    title = 'CREATE ACCOUNT';
+    subtitle = 'Join Royal Service Center today';
   } else if (isForgotPassword) {
-    title = 'RESET ACCESS';
+    title = 'RESET PASSWORD';
     subtitle = 'Enter your email to receive a reset link';
   } else if (resetToken) {
     title = 'NEW PASSWORD';
@@ -115,42 +115,45 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-screen bg-zinc-950 flex flex-col justify-center items-center p-6 font-sans text-zinc-50 selection:bg-red-600 selection:text-white relative overflow-hidden">
+    <div className="min-h-screen bg-zinc-950 flex flex-col justify-center items-center p-4 md:p-6 font-sans text-zinc-50 selection:bg-red-600 selection:text-white relative overflow-hidden">
 
       {/* Ambient red glow */}
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-lg h-[400px] bg-red-600/10 blur-[120px] rounded-full pointer-events-none"></div>
 
       <div className="w-full max-w-md relative z-10 animate-[fadeInUp_0.4s_ease-out]">
 
-        <div className="flex justify-center mb-8">
+        <div className="flex justify-center mb-6 md:mb-8">
           <Link to="/" className="flex items-center gap-3 group cursor-pointer">
-            <div className="w-12 h-12 bg-gradient-to-br from-red-600 to-red-700 rounded-xl flex items-center justify-center shadow-lg shadow-red-600/20 group-hover:shadow-red-600/40 transition-all duration-300 group-hover:-translate-y-1">
-              <span className="text-white font-extrabold text-2xl tracking-tighter">R</span>
-            </div>
+            {/* 🚨 LOGO ADDED HERE */}
+            <img 
+              src="/logo.png" 
+              alt="Royal Service Center Logo" 
+              className="w-16 h-16 md:w-20 md:h-20 object-contain drop-shadow-2xl group-hover:scale-105 transition-transform duration-300" 
+            />
           </Link>
         </div>
 
-        <div className="bg-zinc-900 p-8 md:p-10 rounded-2xl border border-zinc-800 shadow-2xl">
+        <div className="bg-zinc-900 p-6 md:p-10 rounded-2xl border border-zinc-800 shadow-2xl">
 
-          <h2 className="text-3xl font-black text-center mb-2 text-white tracking-tight uppercase">
+          <h2 className="text-2xl md:text-3xl font-black text-center mb-2 text-white tracking-tight uppercase">
             {title}
           </h2>
-          <p className="text-zinc-500 text-center mb-8 text-sm uppercase tracking-widest font-semibold">
+          <p className="text-zinc-500 text-center mb-6 md:mb-8 text-xs md:text-sm tracking-wide font-medium">
             {subtitle}
           </p>
 
-          <form onSubmit={handleSubmit} className="space-y-5">
+          <form onSubmit={handleSubmit} className="space-y-4 md:space-y-5">
             
             {/* Registration Fields */}
             {isRegister && (
-              <div className="space-y-5 animate-[fadeIn_0.3s_ease-out]">
+              <div className="space-y-4 md:space-y-5 animate-[fadeIn_0.3s_ease-out]">
                 <input
                   type="text"
                   name="name"
                   placeholder="Full Name"
                   required
                   onChange={handleChange}
-                  className="w-full bg-zinc-950 border border-zinc-800 text-white p-4 rounded-xl focus:border-red-600 focus:ring-1 focus:ring-red-600 focus:outline-none placeholder:text-zinc-600 transition-colors"
+                  className="w-full bg-zinc-950 border border-zinc-800 text-white p-3 md:p-4 rounded-xl focus:border-red-600 focus:ring-1 focus:ring-red-600 focus:outline-none placeholder:text-zinc-600 transition-colors text-sm md:text-base"
                 />
                 <input
                   type="tel"
@@ -158,7 +161,7 @@ export default function Login() {
                   placeholder="Phone Number"
                   required
                   onChange={handleChange}
-                  className="w-full bg-zinc-950 border border-zinc-800 text-white p-4 rounded-xl focus:border-red-600 focus:ring-1 focus:ring-red-600 focus:outline-none placeholder:text-zinc-600 transition-colors"
+                  className="w-full bg-zinc-950 border border-zinc-800 text-white p-3 md:p-4 rounded-xl focus:border-red-600 focus:ring-1 focus:ring-red-600 focus:outline-none placeholder:text-zinc-600 transition-colors text-sm md:text-base"
                 />
               </div>
             )}
@@ -172,7 +175,7 @@ export default function Login() {
                 required
                 onChange={handleChange}
                 value={formData.email}
-                className="w-full bg-zinc-950 border border-zinc-800 text-white p-4 rounded-xl focus:border-red-600 focus:ring-1 focus:ring-red-600 focus:outline-none placeholder:text-zinc-600 transition-colors"
+                className="w-full bg-zinc-950 border border-zinc-800 text-white p-3 md:p-4 rounded-xl focus:border-red-600 focus:ring-1 focus:ring-red-600 focus:outline-none placeholder:text-zinc-600 transition-colors text-sm md:text-base"
               />
             )}
 
@@ -185,20 +188,20 @@ export default function Login() {
                 required
                 onChange={handleChange}
                 value={formData.password}
-                className="w-full bg-zinc-950 border border-zinc-800 text-white p-4 rounded-xl focus:border-red-600 focus:ring-1 focus:ring-red-600 focus:outline-none placeholder:text-zinc-600 transition-colors"
+                className="w-full bg-zinc-950 border border-zinc-800 text-white p-3 md:p-4 rounded-xl focus:border-red-600 focus:ring-1 focus:ring-red-600 focus:outline-none placeholder:text-zinc-600 transition-colors text-sm md:text-base"
               />
             )}
 
             <button
               type="submit"
-              className="w-full bg-red-600 hover:bg-red-700 text-white py-4 rounded-xl font-bold tracking-widest transition-all duration-300 mt-4 shadow-[0_0_20px_rgba(220,38,38,0.2)] hover:shadow-[0_0_30px_rgba(220,38,38,0.4)] hover:-translate-y-0.5"
+              className="w-full bg-red-600 hover:bg-red-700 text-white py-3 md:py-4 rounded-xl font-bold tracking-wider transition-all duration-300 mt-2 md:mt-4 shadow-[0_0_20px_rgba(220,38,38,0.2)] hover:shadow-[0_0_30px_rgba(220,38,38,0.4)] hover:-translate-y-0.5 text-sm md:text-base"
             >
-              {resetToken ? 'RESET PASSWORD' : isForgotPassword ? 'SEND RESET LINK' : isRegister ? 'REGISTER NOW' : 'SIGN IN'}
+              {resetToken ? 'Reset Password' : isForgotPassword ? 'Send Reset Link' : isRegister ? 'Sign Up' : 'Sign In'}
             </button>
           </form>
 
           {/* Bottom Links */}
-          <div className="mt-8 text-center text-sm font-medium text-zinc-500 flex flex-col gap-3">
+          <div className="mt-6 md:mt-8 text-center text-xs md:text-sm font-medium text-zinc-500 flex flex-col gap-3">
             
             {/* Forgot Password Link */}
             {!isRegister && !isForgotPassword && !resetToken && (
@@ -216,32 +219,32 @@ export default function Login() {
               <button
                 type="button"
                 onClick={() => toggleMode('login')}
-                className="text-zinc-400 hover:text-white transition-colors"
+                className="text-zinc-400 hover:text-white transition-colors font-bold"
               >
-                ← Back to Login
+                ← Back to Sign In
               </button>
             )}
 
             {/* Login/Register Toggle */}
             {!isForgotPassword && !resetToken && (
-              <div>
-                {isRegister ? 'ALREADY AUTHORIZED? ' : 'REQUIRE ACCESS? '}
+              <div className="mt-2 text-zinc-400">
+                {isRegister ? 'Already have an account? ' : "Don't have an account? "}
                 <button
                   type="button"
                   onClick={() => toggleMode(isRegister ? 'login' : 'register')}
-                  className="text-red-500 font-bold hover:text-red-400 transition-colors tracking-wider ml-1"
+                  className="text-red-500 font-bold hover:text-red-400 transition-colors ml-1 hover:underline"
                 >
-                  {isRegister ? 'LOGIN' : 'REGISTER'}
+                  {isRegister ? 'Sign In' : 'Sign Up'}
                 </button>
               </div>
             )}
           </div>
         </div>
 
-        <div className="text-center mt-8">
+        <div className="text-center mt-6 md:mt-8">
           <Link
             to="/"
-            className="text-zinc-600 hover:text-red-500 text-xs font-bold uppercase tracking-widest transition-colors"
+            className="text-zinc-600 hover:text-red-500 text-[10px] md:text-xs font-bold uppercase tracking-widest transition-colors"
           >
             ← Return to Homepage
           </Link>
