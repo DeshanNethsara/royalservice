@@ -24,7 +24,7 @@ export default function Chat() {
   const [unreadCounts, setUnreadCounts] = useState({});
   const [contextMenu, setContextMenu] = useState(null);
 
-  // 🚨 NEW: Mobile view state
+  // Mobile view state
   const [isMobileChatOpen, setIsMobileChatOpen] = useState(false);
 
   const activeThreadRef = useRef(null);
@@ -56,7 +56,7 @@ export default function Chat() {
       return `📅 How to Book an Appointment:\n\n1. Click on "NEW BOOKING" button on the dashboard\n2. Select your vehicle type (Car, SUV, or Van)\n3. Choose the service you need\n4. Enter your vehicle details (Registration number, Make, Model, Year, Mileage)\n5. Select a convenient date and time slot\n6. Review your booking and confirm\n\n✅ Your booking will be confirmed instantly with a reference number.\n\nNote: You can book up to 7 days in advance.`;
     }
     if (q.includes('contact') || q.includes('phone') || q.includes('number') || q.includes('call')) {
-      return `📞 Our Contact Information:\n\nPhone: 074 365 8500\nEmail: support@royalservice.lk\nEmergency: +94 74 365 8500\n\nOur support team is available during operating hours.`;
+      return `📞 Our Contact Information:\n\nPhone: +94 74 365 8500\nEmail: admin@royalservice.tech\n\nOur support team is available during operating hours.`;
     }
     if (q.includes('service') || q.includes('offer') || q.includes('provide')) {
       return `🔧 Our Services:\n\n1. Full Service\n2. Oil Change\n3. Brake Service\n4. AC Service\n5. Tire Service\n6. Engine Diagnostics\n7. Battery Service\n8. Wash & Detailing\n\nPrices vary based on vehicle type.`;
@@ -65,7 +65,7 @@ export default function Chat() {
       return `🕒 Operating Hours:\n\nMonday - Friday: 8:00 AM - 6:00 PM\nSaturday: 9:00 AM - 4:00 PM\nSunday: Closed\n\nLast booking slot is at 3:30 PM.`;
     }
     if (q.includes('location') || q.includes('where') || q.includes('address')) {
-      return `📍 Our Location:\n\nRoyal Service Center\n123 Galle Road,\nColombo 03,\nSri Lanka`;
+      return `📍 Our Location:\n\nRoyal Service Center\n13/5 Service Road,\nColombo 05,\nSri Lanka`;
     }
     if (q.includes('price') || q.includes('cost') || q.includes('pricing') || q.includes('fee')) {
       return `💰 Pricing Information:\n\nStarting Prices:\n- Oil Change: LKR 5,000\n- Full Service: LKR 15,000\n- Brake Service: LKR 8,000\n- AC Service: LKR 6,500\n\nFor exact pricing, visit the booking page.`;
@@ -80,7 +80,7 @@ export default function Chat() {
       return `Hello! 👋 Welcome to Royal Service Center. How can I assist you today?`;
     }
 
-    return `Thank you for your message! I'll help you with that.\n\nFor immediate assistance, call us at 074 365 8500.`;
+    return `Thank you for your message! I'll help you with that.\n\nFor immediate assistance, call us at +94 74 365 8500 or email admin@royalservice.tech.`;
   };
 
   const addMessageIfNew = useCallback((newMessage) => {
@@ -262,7 +262,7 @@ export default function Chat() {
       setTimeout(() => {
         socket.emit('send_message', {
           senderId: 'bot', senderName: 'Royal Service Bot', senderRole: 'bot', threadId: userId,
-          text: `Thank you for your message! I'll help you with that.\n\nYou can also use these quick commands:\n- Ask about booking appointments\n- Inquire about our services\n- Get our contact number\n- Check operating hours\n\nFor immediate assistance, call us at 074 365 8500.`
+          text: `Thank you for your message! I'll help you with that.\n\nYou can also use these quick commands:\n- Ask about booking appointments\n- Inquire about our services\n- Get our contact number\n- Check operating hours\n\nFor immediate assistance, call us at +94 74 365 8500 or email admin@royalservice.tech.`
         });
       }, 1000);
     }
@@ -370,7 +370,6 @@ export default function Chat() {
       <main className="flex-1 relative z-10 max-w-6xl mx-auto w-full p-2 md:p-6 flex flex-col md:flex-row gap-4 md:gap-6 min-h-0 overflow-hidden">
 
         {/* ADMIN SIDEBAR / CONTACT LIST */}
-        {/* On mobile, hide this if the chat is open */}
         {user?.role === 'admin' && (
           <aside className={`w-full md:w-72 lg:w-80 bg-zinc-900 border border-zinc-800 rounded-2xl flex-col overflow-hidden shrink-0 shadow-2xl min-h-0 ${isMobileChatOpen ? 'hidden md:flex' : 'flex'}`}>
             <div className="p-4 border-b border-zinc-800 bg-zinc-950/50 shrink-0">
@@ -385,7 +384,7 @@ export default function Chat() {
                     key={contact._id}
                     onClick={() => {
                       setActiveContact(contact);
-                      setIsMobileChatOpen(true); // 🚨 Open chat view on mobile
+                      setIsMobileChatOpen(true);
                     }}
                     onContextMenu={(e) => handleContextMenu(e, contact)}
                     className={`p-3 rounded-xl cursor-pointer transition-all border relative ${
@@ -417,7 +416,6 @@ export default function Chat() {
         )}
 
         {/* Messaging Area */}
-        {/* On mobile, hide this if no chat is selected (for admin) */}
         <section className={`flex-1 min-w-0 min-h-0 bg-zinc-900 border border-zinc-800 rounded-2xl flex-col overflow-hidden shadow-2xl relative ${user?.role === 'admin' && !isMobileChatOpen ? 'hidden md:flex' : 'flex'}`}>
 
           {/* Chat Header */}
@@ -425,7 +423,6 @@ export default function Chat() {
             <div className="p-3 md:p-4 border-b border-zinc-800 bg-zinc-950/50 flex justify-between items-center shrink-0">
               <div className="flex items-center gap-3">
                 
-                {/* 🚨 NEW: Mobile Back Button */}
                 {user?.role === 'admin' && (
                   <button
                     onClick={() => setIsMobileChatOpen(false)}

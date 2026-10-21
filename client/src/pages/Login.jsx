@@ -81,9 +81,22 @@ export default function Login() {
       toast.dismiss(loadingToast);
       toast.success(isRegister ? 'Account created successfully!' : `Welcome back, ${user.name?.split(' ')[0] || 'there'}!`);
 
-      if (userRole === 'admin') navigate('/admin');
-      else if (userRole === 'staff') navigate('/staff');
-      else navigate('/dashboard');
+      // 🚨 FIX: Redirection Logic
+      // Check if the user was redirected here from trying to book a service
+      const fromBooking = location.state?.from === '/booking';
+      const serviceId = location.state?.serviceId;
+
+      if (fromBooking) {
+        // If they wanted to book, send them straight to the booking flow
+        navigate('/booking', { state: { selectedServiceId: serviceId } });
+      } else if (userRole === 'admin') {
+        navigate('/admin');
+      } else if (userRole === 'staff') {
+        navigate('/staff');
+      } else {
+        // Normal customers stay on the homepage (or go back to where they were)
+        navigate(location.state?.from || '/');
+      }
     } catch (err) {
       toast.dismiss(loadingToast);
       const errMsg = err.response?.data?.message || 'Authentication failed. Please check your credentials.';
@@ -124,7 +137,6 @@ export default function Login() {
 
         <div className="flex justify-center mb-6 md:mb-8">
           <Link to="/" className="flex items-center gap-3 group cursor-pointer">
-            {/* 🚨 LOGO ADDED HERE */}
             <img 
               src="/logo.png" 
               alt="Royal Service Center Logo" 

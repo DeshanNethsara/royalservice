@@ -206,6 +206,7 @@ export default function Homepage() {
           border: '1px solid #3f3f46',
         },
       });
+      // Pass the serviceId so after login, they go straight to booking
       navigate('/login', { state: { from: '/booking', serviceId } });
     }
   };
@@ -215,6 +216,12 @@ export default function Homepage() {
     toast.success('Logged out securely.');
     setIsDropdownOpen(false);
     setIsMobileMenuOpen(false);
+  };
+
+  // 🚨 FIXED: Scroll to top for Home button
+  const scrollToTop = () => {
+    setIsMobileMenuOpen(false);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const scrollToSection = (ref) => {
@@ -294,7 +301,7 @@ export default function Homepage() {
           
           <div
             className="flex items-center gap-2 md:gap-3 cursor-pointer"
-            onClick={() => navigate('/')}
+            onClick={scrollToTop}
             role="button"
             aria-label="Go to homepage"
           >
@@ -303,7 +310,6 @@ export default function Homepage() {
               alt="Royal Service Center Logo" 
               className="w-9 h-9 md:w-12 md:h-12 object-contain rounded-lg" 
             />
-            {/* 🚨 FIXED: Removed 'hidden sm:block' so text shows on mobile */}
             <div className="block">
               <h1 className="text-lg md:text-xl font-black text-zinc-900 tracking-tight leading-none">
                 ROYAL
@@ -316,7 +322,7 @@ export default function Homepage() {
 
           {/* Desktop Nav */}
           <nav className="hidden lg:flex items-center space-x-8">
-            <button onClick={() => navigate('/')} className="text-zinc-900 font-semibold text-sm tracking-wide hover:text-red-600 transition-colors relative group">
+            <button onClick={scrollToTop} className="text-zinc-900 font-semibold text-sm tracking-wide hover:text-red-600 transition-colors relative group">
               HOME
               <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-red-600 group-hover:w-full transition-all duration-300"></span>
             </button>
@@ -332,7 +338,7 @@ export default function Homepage() {
               CONTACT
               <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-red-600 group-hover:w-full transition-all duration-300"></span>
             </button>
-            {user && (
+            {user && user.role !== 'customer' && (
               <button onClick={handleDashboardRedirect} className="text-zinc-600 font-semibold text-sm tracking-wide hover:text-red-600 transition-colors relative group">
                 DASHBOARD
                 <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-red-600 group-hover:w-full transition-all duration-300"></span>
@@ -365,7 +371,12 @@ export default function Homepage() {
                       </div>
                       <div className="py-2">
                         <button onClick={() => { setIsDropdownOpen(false); navigate('/profile'); }} className="block w-full text-left px-4 py-2.5 text-sm font-medium text-zinc-700 hover:text-red-600 hover:bg-zinc-50">Edit Profile</button>
-                        <button onClick={() => { setIsDropdownOpen(false); handleDashboardRedirect(); }} className="block w-full text-left px-4 py-2.5 text-sm font-medium text-zinc-700 hover:text-red-600 hover:bg-zinc-50">My Appointments</button>
+                        {/* 🚨 Customers see "My Appointments", Staff/Admin see "Dashboard" */}
+                        {user.role === 'customer' ? (
+                          <button onClick={() => { setIsDropdownOpen(false); navigate('/dashboard'); }} className="block w-full text-left px-4 py-2.5 text-sm font-medium text-zinc-700 hover:text-red-600 hover:bg-zinc-50">My Appointments</button>
+                        ) : (
+                          <button onClick={() => { setIsDropdownOpen(false); handleDashboardRedirect(); }} className="block w-full text-left px-4 py-2.5 text-sm font-medium text-zinc-700 hover:text-red-600 hover:bg-zinc-50">Dashboard</button>
+                        )}
                         <div className="border-t border-zinc-100 my-1"></div>
                         <button onClick={handleLogout} className="block w-full text-left px-4 py-2.5 text-sm font-medium text-red-600 hover:bg-red-50">Logout</button>
                       </div>
@@ -405,7 +416,7 @@ export default function Homepage() {
         {isMobileMenuOpen && (
           <div className="lg:hidden absolute top-full left-0 right-0 bg-white border-b border-zinc-200 shadow-xl overflow-y-auto max-h-[85vh]">
             <div className="px-4 py-4 space-y-1">
-              <button onClick={() => { setIsMobileMenuOpen(false); navigate('/'); }} className="block w-full text-left px-4 py-3 text-zinc-700 hover:text-red-600 hover:bg-zinc-50 rounded-lg font-medium">Home</button>
+              <button onClick={scrollToTop} className="block w-full text-left px-4 py-3 text-zinc-700 hover:text-red-600 hover:bg-zinc-50 rounded-lg font-medium">Home</button>
               <button onClick={scrollToAbout} className="block w-full text-left px-4 py-3 text-zinc-700 hover:text-red-600 hover:bg-zinc-50 rounded-lg font-medium">About Us</button>
               <button onClick={scrollToServices} className="block w-full text-left px-4 py-3 text-zinc-700 hover:text-red-600 hover:bg-zinc-50 rounded-lg font-medium">Our Services</button>
               <button onClick={scrollToContact} className="block w-full text-left px-4 py-3 text-zinc-700 hover:text-red-600 hover:bg-zinc-50 rounded-lg font-medium">Contact</button>
@@ -414,7 +425,11 @@ export default function Homepage() {
 
               {user ? (
                 <>
-                  <button onClick={() => { setIsMobileMenuOpen(false); handleDashboardRedirect(); }} className="block w-full text-left px-4 py-3 text-zinc-700 hover:text-red-600 hover:bg-zinc-50 rounded-lg font-medium">Dashboard</button>
+                  {user.role === 'customer' ? (
+                    <button onClick={() => { setIsMobileMenuOpen(false); navigate('/dashboard'); }} className="block w-full text-left px-4 py-3 text-zinc-700 hover:text-red-600 hover:bg-zinc-50 rounded-lg font-medium">My Appointments</button>
+                  ) : (
+                    <button onClick={() => { setIsMobileMenuOpen(false); handleDashboardRedirect(); }} className="block w-full text-left px-4 py-3 text-zinc-700 hover:text-red-600 hover:bg-zinc-50 rounded-lg font-medium">Dashboard</button>
+                  )}
                   <button onClick={() => { setIsMobileMenuOpen(false); navigate('/profile'); }} className="block w-full text-left px-4 py-3 text-zinc-700 hover:text-red-600 hover:bg-zinc-50 rounded-lg font-medium">Profile</button>
                   <button onClick={handleLogout} className="block w-full text-left px-4 py-3 text-red-600 hover:bg-red-50 rounded-lg font-medium">Logout</button>
                 </>
@@ -696,6 +711,13 @@ export default function Homepage() {
             </div>
           </div>
 
+          {/* 🚨 Added Email Here */}
+          <div className="text-center mb-10">
+            <p className="text-zinc-400 text-xs md:text-sm">
+              Or email us directly at: <a href="mailto:admin@royalservice.tech" className="text-red-500 font-bold hover:underline">admin@royalservice.tech</a>
+            </p>
+          </div>
+
           <div className="text-center">
             <button onClick={() => handleBookNow()} className="w-full md:w-auto bg-white text-red-600 px-8 md:px-10 py-3 md:py-4 rounded font-black text-sm md:text-base tracking-widest uppercase hover:bg-zinc-100 transition-all duration-300 shadow-xl">
               Book an Appointment
@@ -739,6 +761,10 @@ export default function Homepage() {
                 <li className="flex gap-2 md:gap-3">
                   <svg className="w-4 h-4 md:w-5 md:h-5 text-red-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>
                   <span className="text-zinc-400 text-xs md:text-sm">+94 11 760 0800</span>
+                </li>
+                <li className="flex gap-2 md:gap-3">
+                  <svg className="w-4 h-4 md:w-5 md:h-5 text-red-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
+                  <span className="text-zinc-400 text-xs md:text-sm">admin@royalservice.tech</span>
                 </li>
               </ul>
             </div>
