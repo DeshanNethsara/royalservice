@@ -8,7 +8,6 @@ export default function CustomerDashboard() {
   const { user, logout } = useContext(AuthContext);
   const navigate = useNavigate();
   const [bookings, setBookings] = useState([]);
-  // 🚨 Set default tab to 'All'
   const [activeTab, setActiveTab] = useState('All');
   const [loading, setLoading] = useState(true);
   const [cancellingId, setCancellingId] = useState(null);
@@ -79,7 +78,7 @@ export default function CustomerDashboard() {
     if (timeDifference <= 0) {
       return 'Booking time has passed';
     } else if (timeDifference <= 2) {
-      return `Cannot cancel - less than 2 hours before appointment (${Math.floor(timeDifference)}h ${Math.floor((timeDifference % 1) * 60)}m remaining)`;
+      return `Cannot cancel - less than 2 hours before appointment`;
     }
     return '';
   };
@@ -195,11 +194,9 @@ export default function CustomerDashboard() {
     return bookings.filter((b) => b.status === status).length;
   };
 
-  // 🚨 SMART SORTING & FILTERING LOGIC
   const filteredBookings = useMemo(() => {
     let filtered = bookings;
 
-    // 1. Filter by Tab
     if (activeTab === 'Upcoming') {
       filtered = filtered.filter((b) => b.status === 'Pending' || b.status === 'Confirmed');
     } else if (activeTab === 'In Progress') {
@@ -210,7 +207,6 @@ export default function CustomerDashboard() {
       filtered = filtered.filter((b) => b.status === 'Cancelled' || b.status === 'Rejected');
     }
 
-    // 2. Filter by Search
     if (searchTerm) {
       const lowerSearch = searchTerm.toLowerCase();
       filtered = filtered.filter(
@@ -221,12 +217,11 @@ export default function CustomerDashboard() {
       );
     }
 
-    // 3. Sort: In Progress -> Upcoming (by time) -> Completed/Cancelled
     return filtered.sort((a, b) => {
       const getWeight = (status) => {
         if (status === 'In Progress') return 1;
         if (status === 'Pending' || status === 'Confirmed') return 2;
-        return 3; // Completed, Cancelled, Rejected
+        return 3;
       };
 
       const weightA = getWeight(a.status);
@@ -234,11 +229,9 @@ export default function CustomerDashboard() {
 
       if (weightA !== weightB) return weightA - weightB;
 
-      // If both are in same category, sort by date
       const dateA = new Date(`${a.booking_date}T${a.booking_time}`);
       const dateB = new Date(`${b.booking_date}T${b.booking_time}`);
       
-      // If it's upcoming, show earliest first. If completed, show latest first.
       if (weightA === 2) return dateA - dateB;
       return dateB - dateA;
     });
@@ -248,7 +241,7 @@ export default function CustomerDashboard() {
   const getStatusStyle = (status) => {
     switch (status) {
       case 'Pending': return 'text-amber-500';
-      case 'Confirmed': return 'text-cyan-400'; // 🚨 Changed to Cyan to differentiate from Completed
+      case 'Confirmed': return 'text-cyan-400'; 
       case 'In Progress': return 'text-blue-400';
       case 'Completed': return 'text-emerald-400';
       case 'Cancelled':
@@ -329,20 +322,12 @@ export default function CustomerDashboard() {
       <header className="sticky top-0 z-50 bg-zinc-950/80 backdrop-blur-xl border-b border-zinc-800 shadow-2xl">
         <div className="max-w-7xl mx-auto px-4 md:px-6 py-4 flex justify-between items-center">
           <Link to="/" className="flex items-center gap-3 group cursor-pointer">
-            <img 
-              src="/logo.png" 
-              alt="Royal Service Center Logo" 
-              className="w-10 h-10 object-contain rounded-lg shadow-lg" 
-            />
-            <h1 className="text-xl font-bold text-white tracking-widest uppercase hidden md:block">
-              Royal Service
-            </h1>
+            <img src="/logo.png" alt="Logo" className="w-10 h-10 object-contain rounded-lg shadow-lg" />
+            <h1 className="text-xl font-bold text-white tracking-widest uppercase hidden md:block">Royal Service</h1>
           </Link>
 
           <nav className="flex items-center space-x-3 md:space-x-6">
-            <Link to="/" className="text-zinc-400 hover:text-red-500 text-sm font-semibold tracking-wide transition-colors hidden sm:block">
-              HOME
-            </Link>
+            <Link to="/" className="text-zinc-400 hover:text-red-500 text-sm font-semibold tracking-wide transition-colors hidden sm:block">HOME</Link>
             <Link to="/booking" className="text-red-500 hover:text-red-400 text-sm font-bold tracking-wide transition-colors flex items-center gap-2">
               <span className="text-lg">+</span>
               <span className="hidden sm:inline">NEW BOOKING</span>
@@ -366,7 +351,6 @@ export default function CustomerDashboard() {
 
         <div className="relative z-10">
           
-          {/* Welcome Section */}
           <div className="mb-8">
             <h2 className="text-2xl md:text-3xl font-black text-white tracking-tight">
               Welcome back, {user?.name?.split(' ')[0] || 'Commander'}
@@ -378,15 +362,12 @@ export default function CustomerDashboard() {
 
           {/* Tabs */}
           <div className="border-b border-zinc-800 mb-6 flex overflow-x-auto hide-scrollbar">
-            {/* 🚨 Added 'All' tab here */}
             {['All', 'Upcoming', 'In Progress', 'Completed', 'Cancelled'].map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
                 className={`pb-4 px-6 text-sm font-bold tracking-wide transition-colors border-b-2 whitespace-nowrap flex items-center gap-2 ${
-                  activeTab === tab
-                    ? 'border-red-600 text-red-500'
-                    : 'border-transparent text-zinc-400 hover:text-white'
+                  activeTab === tab ? 'border-red-600 text-red-500' : 'border-transparent text-zinc-400 hover:text-white'
                 }`}
               >
                 {tab}
@@ -399,7 +380,7 @@ export default function CustomerDashboard() {
             ))}
           </div>
 
-          {/* Toolbar (Search Only) */}
+          {/* Toolbar */}
           <div className="flex flex-col md:flex-row justify-between items-center gap-4 mb-6">
             <div className="flex gap-3 w-full md:w-auto">
               <div className="relative w-full md:w-80">
@@ -421,12 +402,11 @@ export default function CustomerDashboard() {
           {loading ? (
             <div className="space-y-3">
               {[...Array(3)].map((_, i) => (
-                <div key={i} className="bg-zinc-900 h-20 rounded-xl border border-zinc-800 animate-pulse"></div>
+                <div key={i} className="bg-zinc-900 h-24 rounded-xl border border-zinc-800 animate-pulse"></div>
               ))}
             </div>
           ) : filteredBookings.length === 0 ? (
             
-            /* Empty State */
             <div className="flex flex-col items-center justify-center py-20">
               <div className="w-32 h-32 mb-6 opacity-80 relative">
                 <div className="absolute inset-0 bg-red-600/5 rounded-full blur-2xl"></div>
@@ -450,130 +430,124 @@ export default function CustomerDashboard() {
 
           ) : (
             
-            /* List View */
-            <div className="space-y-3">
-              {filteredBookings.map((booking) => {
-                const canCancel = canCancelBooking(booking);
-                const cancelMessage = getCancellationMessage(booking);
-                const isCompleted = booking.status === 'Completed';
+            /* 🚨 NEW: Clean List View */
+            <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
+              <div className="divide-y divide-zinc-800/50">
+                {filteredBookings.map((booking) => {
+                  const canCancel = canCancelBooking(booking);
+                  const isCompleted = booking.status === 'Completed';
+                  const isActionable = (activeTab === 'Upcoming' || activeTab === 'All') && ['Pending', 'Confirmed'].includes(booking.status);
 
-                return (
-                  <div
-                    key={booking._id}
-                    className="bg-zinc-900 border border-zinc-800 rounded-xl p-5 hover:border-zinc-600 transition-colors flex flex-col md:flex-row justify-between items-start md:items-center gap-6"
-                  >
-                    {/* Left Side: Info */}
-                    <div className="flex-1 w-full grid grid-cols-1 md:grid-cols-4 gap-4 items-center">
+                  return (
+                    <div
+                      key={booking._id}
+                      className="p-5 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 hover:bg-zinc-800/30 transition-colors"
+                    >
                       
-                      {/* Ref & Status */}
-                      <div>
+                      {/* Left Section: Ref & Status */}
+                      <div className="w-full lg:w-48 shrink-0">
                         <div className="font-bold text-white text-sm tracking-wider">{booking.booking_ref}</div>
                         <div className={`text-xs font-bold uppercase mt-1 ${getStatusStyle(booking.status)}`}>
                           {booking.status}
                         </div>
                       </div>
 
-                      {/* Service */}
-                      <div>
-                        <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider mb-0.5">Service</p>
-                        <p className="text-zinc-200 text-sm font-medium">{booking.service_id?.name || 'N/A'}</p>
-                      </div>
-
-                      {/* Vehicle */}
-                      <div>
-                        <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider mb-0.5">Vehicle</p>
-                        <p className="text-zinc-200 text-sm font-medium">
-                          {booking.vehicle_id?.reg_number?.toUpperCase() || 'N/A'}
-                        </p>
-                      </div>
-
-                      {/* Date */}
-                      <div>
-                        <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider mb-0.5">Schedule</p>
-                        <p className="text-zinc-200 text-sm font-medium">{booking.booking_date}</p>
-                        <p className="text-zinc-500 text-xs">{booking.booking_time}</p>
-                      </div>
-                    </div>
-
-                    {/* Right Side: Actions */}
-                    <div className="flex items-center gap-3 w-full md:w-auto shrink-0 md:border-l border-zinc-800 md:pl-6">
-                      
-                      {(activeTab === 'Upcoming' || activeTab === 'All') && ['Pending', 'Confirmed'].includes(booking.status) && (
-                        <div className="flex flex-col items-end w-full md:w-auto">
-                          <button
-                            onClick={() => handleCancel(booking)}
-                            disabled={!canCancel || cancellingId === booking._id}
-                            className={`px-4 py-2 rounded-lg text-xs font-bold tracking-wider transition-all w-full md:w-auto ${
-                              canCancel
-                                ? 'border border-red-600/40 text-red-500 hover:bg-red-600/10'
-                                : 'border border-zinc-800 text-zinc-600 cursor-not-allowed opacity-50'
-                            }`}
-                          >
-                            {cancellingId === booking._id ? 'CANCELLING...' : 'CANCEL'}
-                          </button>
-                          {!canCancel && (
-                            <span className="text-[10px] text-amber-500 mt-1 max-w-[150px] text-right">
-                              {cancelMessage}
-                            </span>
-                          )}
+                      {/* Middle Section: Details */}
+                      <div className="flex-1 w-full grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                          <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider mb-0.5">Service</p>
+                          <p className="text-zinc-200 text-sm font-medium">{booking.service_id?.name || 'N/A'}</p>
                         </div>
-                      )}
-                      
-                      {isCompleted && (
-                        <>
-                          {!booking.rating && (
+                        <div>
+                          <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider mb-0.5">Vehicle</p>
+                          <p className="text-zinc-200 text-sm font-medium">
+                            {booking.vehicle_id?.reg_number?.toUpperCase() || 'N/A'}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider mb-0.5">Schedule</p>
+                          <p className="text-zinc-200 text-sm font-medium">{booking.booking_date}</p>
+                          <p className="text-zinc-500 text-xs">{booking.booking_time}</p>
+                        </div>
+                      </div>
+
+                      {/* Right Section: Actions */}
+                      <div className="w-full lg:w-auto shrink-0 flex items-center justify-end gap-3 lg:border-l border-zinc-800 lg:pl-6">
+                        
+                        {isActionable && (
+                          <div className="flex flex-col items-end">
                             <button
-                              onClick={() => openRatingModal(booking)}
-                              className="px-4 py-2 bg-amber-500/10 text-amber-500 border border-amber-500/30 hover:bg-amber-500 hover:text-white rounded-lg text-xs font-bold tracking-wider transition-all"
+                              onClick={() => handleCancel(booking)}
+                              disabled={!canCancel || cancellingId === booking._id}
+                              className={`px-4 py-2 rounded-lg text-xs font-bold tracking-wider transition-all w-full md:w-auto ${
+                                canCancel
+                                  ? 'border border-red-600/40 text-red-500 hover:bg-red-600/10'
+                                  : 'border border-zinc-800 text-zinc-600 cursor-not-allowed opacity-50'
+                              }`}
                             >
-                              RATE
+                              {cancellingId === booking._id ? '...' : 'CANCEL'}
                             </button>
-                          )}
-                          
-                          <button
-                            onClick={() => handleDownloadRecord(booking)}
-                            disabled={downloadingId === booking._id}
-                            className="flex items-center gap-2 px-4 py-2 text-xs font-bold tracking-wider text-zinc-300 bg-transparent border border-zinc-600 rounded-lg hover:bg-zinc-800 transition-colors disabled:opacity-50"
-                          >
-                            {downloadingId === booking._id ? (
-                              'DOWNLOADING...'
-                            ) : (
-                              <>
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                                </svg>
-                                Download Report
-                              </>
+                            {!canCancel && (
+                              <span className="text-[10px] text-amber-500 mt-1 max-w-[150px] text-right">
+                                {getCancellationMessage(booking)}
+                              </span>
                             )}
-                          </button>
+                          </div>
+                        )}
+                        
+                        {isCompleted && (
+                          <>
+                            {!booking.rating && (
+                              <button
+                                onClick={() => openRatingModal(booking)}
+                                className="px-4 py-2 bg-amber-500/10 text-amber-500 border border-amber-500/30 hover:bg-amber-500 hover:text-white rounded-lg text-xs font-bold tracking-wider transition-all"
+                              >
+                                RATE
+                              </button>
+                            )}
+                            
+                            <button
+                              onClick={() => handleDownloadRecord(booking)}
+                              disabled={downloadingId === booking._id}
+                              className="flex items-center gap-2 px-4 py-2 text-xs font-bold tracking-wider text-zinc-300 bg-transparent border border-zinc-600 rounded-lg hover:bg-zinc-800 transition-colors disabled:opacity-50"
+                            >
+                              {downloadingId === booking._id ? (
+                                '...'
+                              ) : (
+                                <>
+                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                                  </svg>
+                                  Download
+                                </>
+                              )}
+                            </button>
 
-                          {booking.rating && (
-                            <div className="flex items-center text-amber-400 ml-2">
-                              {[...Array(5)].map((_, i) => (
-                                <svg key={i} className={`w-3.5 h-3.5 ${i < booking.rating ? 'fill-current' : 'text-zinc-700'}`} viewBox="0 0 20 20">
-                                  <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                                </svg>
-                              ))}
-                            </div>
-                          )}
-                        </>
-                      )}
-
+                            {booking.rating && (
+                              <div className="flex items-center text-amber-400 ml-2">
+                                {[...Array(5)].map((_, i) => (
+                                  <svg key={i} className={`w-3.5 h-3.5 ${i < booking.rating ? 'fill-current' : 'text-zinc-700'}`} viewBox="0 0 20 20">
+                                    <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                                  </svg>
+                                ))}
+                              </div>
+                            )}
+                          </>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                );
-              })}
+                  );
+                })}
+              </div>
             </div>
           )}
         </div>
       </main>
 
-      {/* MODERN FLOATING CHAT BUTTON */}
+      {/* Chat Button */}
       <button
         onClick={handleChatRedirect}
         className="fixed bottom-6 right-6 z-40 group"
-        aria-label="Chat with support"
-        title="Chat with support"
       >
         <span className="absolute inset-0 rounded-full bg-red-600/30 animate-ping opacity-75"></span>
         <span className="absolute inset-0 rounded-full bg-red-600/20 animate-pulse"></span>
@@ -585,29 +559,13 @@ export default function CustomerDashboard() {
             </svg>
             <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-400 border-2 border-red-600"></span>
           </span>
-
-          <span className="text-xs font-black tracking-widest uppercase whitespace-nowrap">
-            Chat
-          </span>
-
-          <span className="absolute inset-0 rounded-full bg-gradient-to-r from-transparent via-white/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"></span>
-        </span>
-
-        <span className="hidden md:block absolute right-full mr-4 top-1/2 -translate-y-1/2 bg-zinc-900 text-white text-xs font-bold px-3 py-2 rounded-lg whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none shadow-xl border border-zinc-800">
-          Chat with Support
-          <span className="absolute left-full top-1/2 -translate-y-1/2 border-8 border-transparent border-l-zinc-900"></span>
+          <span className="text-xs font-black tracking-widest uppercase whitespace-nowrap">Chat</span>
         </span>
       </button>
 
-      {/* CSS to hide scrollbar for tabs */}
       <style dangerouslySetInnerHTML={{__html: `
-        .hide-scrollbar::-webkit-scrollbar {
-          display: none;
-        }
-        .hide-scrollbar {
-          -ms-overflow-style: none;
-          scrollbar-width: none;
-        }
+        .hide-scrollbar::-webkit-scrollbar { display: none; }
+        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
       `}} />
     </div>
   );
