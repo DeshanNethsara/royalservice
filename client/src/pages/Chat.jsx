@@ -1,7 +1,7 @@
 import React, { useState, useContext, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
-import axiosClient from '../api/axiosClient'; // 🚨 Import axiosClient for real data
+import axiosClient from '../api/axiosClient';
 import io from 'socket.io-client';
 import toast from 'react-hot-toast';
 
@@ -47,7 +47,7 @@ export default function Chat() {
     { id: 'status', label: '📊 Booking Status', question: 'How can I check my booking status?' }
   ];
 
-  // 🚨 NEW: Function to fetch real booking data
+  // Fetch Real Booking Status
   const fetchRealBookingStatus = async () => {
     try {
       const response = await axiosClient.get('/bookings/my-bookings');
@@ -57,7 +57,6 @@ export default function Chat() {
         return "You don't have any bookings yet. Click the 'New Booking' button on the dashboard to schedule a service!";
       }
 
-      // Get the 3 most recent bookings
       const recentBookings = bookings.slice(0, 3).map(b => {
         const date = new Date(b.booking_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
         return `• ${b.service_id?.name || 'Service'} (${date}) - Status: ${b.status}`;
@@ -70,11 +69,43 @@ export default function Chat() {
     }
   };
 
+  // Fetch Real Pricing
+  const fetchRealPricing = async () => {
+    try {
+      const response = await axiosClient.get('/services');
+      const services = response.data;
+
+      if (!services || services.length === 0) {
+        return "We are currently updating our service prices. Please check back shortly or visit the booking page!";
+      }
+
+      const priceList = services.slice(0, 6).map(s => {
+        let priceStr = '';
+        if (typeof s.price === 'number') {
+          priceStr = `LKR ${s.price.toLocaleString()}`;
+        } else if (s.price?.Car) {
+          priceStr = `From LKR ${s.price.Car.toLocaleString()}`;
+        } else {
+          priceStr = 'Contact for price';
+        }
+        return `• ${s.name}: ${priceStr}`;
+      }).join('\n');
+
+      return `💰 Our Current Service Prices:\n\n${priceList}\n\n*Prices vary based on vehicle type (Car, SUV, Van). For exact pricing, please visit the Booking page!*`;
+    } catch (error) {
+      console.error("Failed to fetch pricing:", error);
+      return "I'm having trouble accessing our pricing right now. Please try again later or visit the booking page.";
+    }
+  };
+
   const getAutoReply = async (question) => {
     const q = question.toLowerCase();
 
     if (q.includes('status') || q.includes('track') || q.includes('check')) {
       return await fetchRealBookingStatus();
+    }
+    if (q.includes('price') || q.includes('cost') || q.includes('pricing') || q.includes('fee')) {
+      return await fetchRealPricing();
     }
     if (q.includes('cancel') || q.includes('cancellation')) {
       return `❌ How to Cancel a Booking:\n\n1. Go to your Dashboard\n2. Navigate to "Upcoming" bookings\n3. Find the booking you want to cancel\n4. Click the "CANCEL" button\n5. Confirm your cancellation\n\n⚠️ Important: Cancellations must be made at least 2 hours before your appointment time.`;
@@ -93,9 +124,6 @@ export default function Chat() {
     }
     if (q.includes('location') || q.includes('where') || q.includes('address')) {
       return `📍 Our Location:\n\nRoyal Service Center\n13/5 Service Road,\nColombo 05,\nSri Lanka`;
-    }
-    if (q.includes('price') || q.includes('cost') || q.includes('pricing') || q.includes('fee')) {
-      return `💰 Pricing Information:\n\nStarting Prices:\n- Oil Change: LKR 5,000\n- Full Service: LKR 15,000\n- Brake Service: LKR 8,000\n- AC Service: LKR 6,500\n\nFor exact pricing, visit the booking page.`;
     }
     if (q.includes('thank') || q.includes('thanks')) {
       return `You're welcome! 😊 Is there anything else I can help you with?`;
@@ -142,6 +170,8 @@ export default function Chat() {
     });
 
     const handleContactsList = (list) => setContacts(list);
+    
+    // 🚨 Update contact list AND active chat when a user comes online
     const handleUserOnline = (newUser) => {
       setContacts(prev => {
         const idx = prev.findIndex(c => c._id === newUser._id);
@@ -152,10 +182,25 @@ export default function Chat() {
         }
         return [...prev, { ...newUser, isOnline: true }];
       });
+      
+      setActiveContact(prev => 
+        prev && String(prev._id) === String(newUser._id) 
+          ? { ...prev, isOnline: true } 
+          : prev
+      );
     };
+
+    // 🚨 Update contact list AND active chat when a user goes offline
     const handleUserOffline = ({ userId }) => {
       setContacts(prev => prev.map(c => String(c._id) === String(userId) ? { ...c, isOnline: false } : c));
+      
+      setActiveContact(prev => 
+        prev && String(prev._id) === String(userId) 
+          ? { ...prev, isOnline: false } 
+          : prev
+      );
     };
+
     const handleContactUpdated = ({ threadId, lastMessageAt }) => {
       setContacts(prev => {
         const updated = prev.map(c => String(c._id) === String(threadId) ? { ...c, lastMessageAt } : c);
@@ -285,7 +330,7 @@ export default function Chat() {
       hasSentFirstMessageRef.current = true;
       setTimeout(() => {
         socket.emit('send_message', {
-          senderId: 'bot', senderName: 'Royal Service Center', senderRole: 'bot', threadId: userId, // 🚨 Changed name here
+          senderId: 'bot', senderName: 'Royal Service Center', senderRole: 'bot', threadId: userId,
           text: `Thank you for your message! I'll help you with that.\n\nYou can also use these quick commands:\n- Ask about booking appointments\n- Inquire about our services\n- Get our contact number\n- Check operating hours\n\nFor immediate assistance, call us at +94 74 365 8500 or email admin@royalservice.tech.`
         });
       }, 1000);
@@ -296,13 +341,11 @@ export default function Chat() {
     if (user?.role === 'admin' || !activeContact || !user) return;
     const userId = getUserId();
     
-    // Send user's question
     socket.emit('send_message', { senderId: userId, senderName: user.name, senderRole: user.role, threadId: userId, text: command.question });
     
-    // Simulate bot typing delay
     setTimeout(async () => {
-      const replyText = await getAutoReply(command.question); // 🚨 Await real data
-      socket.emit('send_message', { senderId: 'bot', senderName: 'Royal Service Center', senderRole: 'bot', threadId: userId, text: replyText }); // 🚨 Changed name here
+      const replyText = await getAutoReply(command.question);
+      socket.emit('send_message', { senderId: 'bot', senderName: 'Royal Service Center', senderRole: 'bot', threadId: userId, text: replyText });
     }, 800);
   };
 
@@ -467,9 +510,13 @@ export default function Chat() {
                   <span className="text-xs font-bold text-red-500">{activeContact.name?.charAt(0)?.toUpperCase() || 'B'}</span>
                 </div>
                 <div>
-                  {/* 🚨 Changed Name Here */}
                   <span className="font-bold text-white text-sm">{user?.role === 'admin' ? activeContact.name : 'Royal Service Center'}</span>
-                  <p className="text-[10px] text-zinc-500">{isTyping ? `${typingUser} is typing...` : 'online'}</p>
+                  {/* 🚨 FIX: Accurate online/offline status */}
+                  <p className="text-[10px] text-zinc-500">
+                    {isTyping 
+                      ? `${typingUser} is typing...` 
+                      : (user?.role === 'admin' ? (activeContact.isOnline ? 'online' : 'offline') : 'online')}
+                  </p>
                 </div>
               </div>
               <button
