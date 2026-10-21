@@ -8,7 +8,8 @@ export default function CustomerDashboard() {
   const { user, logout } = useContext(AuthContext);
   const navigate = useNavigate();
   const [bookings, setBookings] = useState([]);
-  const [activeTab, setActiveTab] = useState('Upcoming');
+  // 🚨 Set default tab to 'All'
+  const [activeTab, setActiveTab] = useState('All');
   const [loading, setLoading] = useState(true);
   const [cancellingId, setCancellingId] = useState(null);
   const [downloadingId, setDownloadingId] = useState(null);
@@ -33,8 +34,7 @@ export default function CustomerDashboard() {
     try {
       setLoading(true);
       const response = await axiosClient.get('/bookings/my-bookings');
-      const sorted = response.data.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-      setBookings(sorted);
+      setBookings(response.data);
     } catch (error) {
       console.error('Error fetching bookings:', error);
       toast.error('Failed to load your bookings.');
@@ -188,24 +188,29 @@ export default function CustomerDashboard() {
   };
 
   const getStatusCount = (status) => {
+    if (status === 'All') return bookings.length;
     if (status === 'Upcoming') {
       return bookings.filter((b) => b.status === 'Pending' || b.status === 'Confirmed').length;
     }
     return bookings.filter((b) => b.status === status).length;
   };
 
+  // 🚨 SMART SORTING & FILTERING LOGIC
   const filteredBookings = useMemo(() => {
     let filtered = bookings;
 
-    if (activeTab === 'Upcoming')
+    // 1. Filter by Tab
+    if (activeTab === 'Upcoming') {
       filtered = filtered.filter((b) => b.status === 'Pending' || b.status === 'Confirmed');
-    else if (activeTab === 'In Progress')
+    } else if (activeTab === 'In Progress') {
       filtered = filtered.filter((b) => b.status === 'In Progress');
-    else if (activeTab === 'Completed')
+    } else if (activeTab === 'Completed') {
       filtered = filtered.filter((b) => b.status === 'Completed');
-    else if (activeTab === 'Cancelled')
+    } else if (activeTab === 'Cancelled') {
       filtered = filtered.filter((b) => b.status === 'Cancelled' || b.status === 'Rejected');
+    }
 
+    // 2. Filter by Search
     if (searchTerm) {
       const lowerSearch = searchTerm.toLowerCase();
       filtered = filtered.filter(
@@ -216,13 +221,34 @@ export default function CustomerDashboard() {
       );
     }
 
-    return filtered;
+    // 3. Sort: In Progress -> Upcoming (by time) -> Completed/Cancelled
+    return filtered.sort((a, b) => {
+      const getWeight = (status) => {
+        if (status === 'In Progress') return 1;
+        if (status === 'Pending' || status === 'Confirmed') return 2;
+        return 3; // Completed, Cancelled, Rejected
+      };
+
+      const weightA = getWeight(a.status);
+      const weightB = getWeight(b.status);
+
+      if (weightA !== weightB) return weightA - weightB;
+
+      // If both are in same category, sort by date
+      const dateA = new Date(`${a.booking_date}T${a.booking_time}`);
+      const dateB = new Date(`${b.booking_date}T${b.booking_time}`);
+      
+      // If it's upcoming, show earliest first. If completed, show latest first.
+      if (weightA === 2) return dateA - dateB;
+      return dateB - dateA;
+    });
+
   }, [bookings, activeTab, searchTerm]);
 
   const getStatusStyle = (status) => {
     switch (status) {
       case 'Pending': return 'text-amber-500';
-      case 'Confirmed': return 'text-emerald-400';
+      case 'Confirmed': return 'text-cyan-400'; // 🚨 Changed to Cyan to differentiate from Completed
       case 'In Progress': return 'text-blue-400';
       case 'Completed': return 'text-emerald-400';
       case 'Cancelled':
@@ -303,30 +329,21 @@ export default function CustomerDashboard() {
       <header className="sticky top-0 z-50 bg-zinc-950/80 backdrop-blur-xl border-b border-zinc-800 shadow-2xl">
         <div className="max-w-7xl mx-auto px-4 md:px-6 py-4 flex justify-between items-center">
           <Link to="/" className="flex items-center gap-3 group cursor-pointer">
-            
-            {/* 🚨 LOGO IMAGE ADDED HERE */}
             <img 
               src="/logo.png" 
               alt="Royal Service Center Logo" 
               className="w-10 h-10 object-contain rounded-lg shadow-lg" 
             />
-            
             <h1 className="text-xl font-bold text-white tracking-widest uppercase hidden md:block">
               Royal Service
             </h1>
           </Link>
 
           <nav className="flex items-center space-x-3 md:space-x-6">
-            <Link
-              to="/"
-              className="text-zinc-400 hover:text-red-500 text-sm font-semibold tracking-wide transition-colors hidden sm:block"
-            >
+            <Link to="/" className="text-zinc-400 hover:text-red-500 text-sm font-semibold tracking-wide transition-colors hidden sm:block">
               HOME
             </Link>
-            <Link
-              to="/booking"
-              className="text-red-500 hover:text-red-400 text-sm font-bold tracking-wide transition-colors flex items-center gap-2"
-            >
+            <Link to="/booking" className="text-red-500 hover:text-red-400 text-sm font-bold tracking-wide transition-colors flex items-center gap-2">
               <span className="text-lg">+</span>
               <span className="hidden sm:inline">NEW BOOKING</span>
             </Link>
@@ -361,7 +378,8 @@ export default function CustomerDashboard() {
 
           {/* Tabs */}
           <div className="border-b border-zinc-800 mb-6 flex overflow-x-auto hide-scrollbar">
-            {['Upcoming', 'In Progress', 'Completed', 'Cancelled'].map((tab) => (
+            {/* 🚨 Added 'All' tab here */}
+            {['All', 'Upcoming', 'In Progress', 'Completed', 'Cancelled'].map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
@@ -424,10 +442,7 @@ export default function CustomerDashboard() {
                 We couldn't find any {activeTab.toLowerCase()} bookings matching your criteria.
               </p>
               {activeTab === 'Upcoming' && !searchTerm && (
-                <Link
-                  to="/booking"
-                  className="bg-red-600 hover:bg-red-700 text-white px-6 py-2.5 rounded-lg text-sm font-bold transition-all shadow-lg shadow-red-600/20"
-                >
+                <Link to="/booking" className="bg-red-600 hover:bg-red-700 text-white px-6 py-2.5 rounded-lg text-sm font-bold transition-all shadow-lg shadow-red-600/20">
                   Book a Service
                 </Link>
               )}
@@ -483,7 +498,7 @@ export default function CustomerDashboard() {
                     {/* Right Side: Actions */}
                     <div className="flex items-center gap-3 w-full md:w-auto shrink-0 md:border-l border-zinc-800 md:pl-6">
                       
-                      {activeTab === 'Upcoming' && (
+                      {(activeTab === 'Upcoming' || activeTab === 'All') && ['Pending', 'Confirmed'].includes(booking.status) && (
                         <div className="flex flex-col items-end w-full md:w-auto">
                           <button
                             onClick={() => handleCancel(booking)}
