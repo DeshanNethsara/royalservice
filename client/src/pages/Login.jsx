@@ -71,32 +71,41 @@ export default function Login() {
     try {
       const endpoint = isRegister ? '/auth/register' : '/auth/login';
       const payload = isRegister ? formData : { email: formData.email, password: formData.password };
+      
       const { data } = await axiosClient.post(endpoint, payload);
 
-      const user = data.user || data;
+      // 🚨 FIX: Since backend returns data directly, we extract properly
+      const user = data.user || data; 
       const token = data.token;
       const userRole = (user.role || data.role || 'customer').toLowerCase();
 
+      // Update the AuthContext
       login(user, token);
+      
       toast.dismiss(loadingToast);
       toast.success(isRegister ? 'Account created successfully!' : `Welcome back, ${user.name?.split(' ')[0] || 'there'}!`);
 
-      // 🚨 FIX: Redirection Logic
-      // Check if the user was redirected here from trying to book a service
+      // 🚨 FIX: Redirect Logic
       const fromBooking = location.state?.from === '/booking';
       const serviceId = location.state?.serviceId;
 
-      if (fromBooking) {
-        // If they wanted to book, send them straight to the booking flow
-        navigate('/booking', { state: { selectedServiceId: serviceId } });
-      } else if (userRole === 'admin') {
-        navigate('/admin');
-      } else if (userRole === 'staff') {
-        navigate('/staff');
-      } else {
-        // Normal customers stay on the homepage (or go back to where they were)
-        navigate(location.state?.from || '/');
-      }
+      // Use setTimeout to ensure AuthContext state is updated before routing
+      setTimeout(() => {
+        if (fromBooking) {
+          navigate('/booking', { state: { selectedServiceId: serviceId } });
+        } else if (userRole === 'admin') {
+          navigate('/admin');
+        } else if (userRole === 'staff') {
+          navigate('/staff');
+        } else if (isRegister) {
+          // 🚨 NEW: Newly registered users go to dashboard
+          navigate('/dashboard');
+        } else {
+          // Normal returning customers stay on homepage
+          navigate(location.state?.from || '/');
+        }
+      }, 100);
+
     } catch (err) {
       toast.dismiss(loadingToast);
       const errMsg = err.response?.data?.message || 'Authentication failed. Please check your credentials.';

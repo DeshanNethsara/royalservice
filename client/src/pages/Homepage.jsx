@@ -336,9 +336,14 @@ export default function Homepage() {
               CONTACT
               <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-red-600 group-hover:w-full transition-all duration-300"></span>
             </button>
-            {user && user.role !== 'customer' && (
-              <button onClick={handleDashboardRedirect} className="text-zinc-600 font-semibold text-sm tracking-wide hover:text-red-600 transition-colors relative group">
-                DASHBOARD
+            
+            {/* 🚨 NEW: Show for all logged-in users */}
+            {user && (
+              <button 
+                onClick={handleDashboardRedirect} 
+                className="text-zinc-600 font-semibold text-sm tracking-wide hover:text-red-600 transition-colors relative group"
+              >
+                {user.role === 'customer' ? 'MY BOOKINGS' : 'DASHBOARD'}
                 <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-red-600 group-hover:w-full transition-all duration-300"></span>
               </button>
             )}
@@ -369,11 +374,9 @@ export default function Homepage() {
                       </div>
                       <div className="py-2">
                         <button onClick={() => { setIsDropdownOpen(false); navigate('/profile'); }} className="block w-full text-left px-4 py-2.5 text-sm font-medium text-zinc-700 hover:text-red-600 hover:bg-zinc-50">Edit Profile</button>
-                        {user.role === 'customer' ? (
-                          <button onClick={() => { setIsDropdownOpen(false); navigate('/dashboard'); }} className="block w-full text-left px-4 py-2.5 text-sm font-medium text-zinc-700 hover:text-red-600 hover:bg-zinc-50">My Appointments</button>
-                        ) : (
-                          <button onClick={() => { setIsDropdownOpen(false); handleDashboardRedirect(); }} className="block w-full text-left px-4 py-2.5 text-sm font-medium text-zinc-700 hover:text-red-600 hover:bg-zinc-50">Dashboard</button>
-                        )}
+                        <button onClick={() => { setIsDropdownOpen(false); handleDashboardRedirect(); }} className="block w-full text-left px-4 py-2.5 text-sm font-medium text-zinc-700 hover:text-red-600 hover:bg-zinc-50">
+                          {user.role === 'customer' ? 'My Bookings' : 'Dashboard'}
+                        </button>
                         <div className="border-t border-zinc-100 my-1"></div>
                         <button onClick={handleLogout} className="block w-full text-left px-4 py-2.5 text-sm font-medium text-red-600 hover:bg-red-50">Logout</button>
                       </div>
@@ -422,11 +425,10 @@ export default function Homepage() {
 
               {user ? (
                 <>
-                  {user.role === 'customer' ? (
-                    <button onClick={() => { setIsMobileMenuOpen(false); navigate('/dashboard'); }} className="block w-full text-left px-4 py-3 text-zinc-700 hover:text-red-600 hover:bg-zinc-50 rounded-lg font-medium">My Appointments</button>
-                  ) : (
-                    <button onClick={() => { setIsMobileMenuOpen(false); handleDashboardRedirect(); }} className="block w-full text-left px-4 py-3 text-zinc-700 hover:text-red-600 hover:bg-zinc-50 rounded-lg font-medium">Dashboard</button>
-                  )}
+                  {/* 🚨 NEW: Show in mobile menu too */}
+                  <button onClick={() => { setIsMobileMenuOpen(false); handleDashboardRedirect(); }} className="block w-full text-left px-4 py-3 text-zinc-700 hover:text-red-600 hover:bg-zinc-50 rounded-lg font-medium">
+                    {user.role === 'customer' ? 'My Bookings' : 'Dashboard'}
+                  </button>
                   <button onClick={() => { setIsMobileMenuOpen(false); navigate('/profile'); }} className="block w-full text-left px-4 py-3 text-zinc-700 hover:text-red-600 hover:bg-zinc-50 rounded-lg font-medium">Profile</button>
                   <button onClick={handleLogout} className="block w-full text-left px-4 py-3 text-red-600 hover:bg-red-50 rounded-lg font-medium">Logout</button>
                 </>
