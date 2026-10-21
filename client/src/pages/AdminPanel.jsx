@@ -26,6 +26,10 @@ export default function AdminPanel() {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
 
+  // 🚨 NEW: Pagination State
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 20;
+
   // Form States
   const [newStaff, setNewStaff] = useState({ name: '', email: '', phone: '', password: '' });
   const [newService, setNewService] = useState({ name: '', price_car: '', price_suv: '', price_van: '', description: '' });
@@ -54,7 +58,6 @@ export default function AdminPanel() {
       setServices(servicesRes.data);
       setUsers(usersRes.data);
       
-      // SORT LATEST BOOKINGS FIRST (using created_at)
       const sortedBookings = bookingsRes.data.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
       setBookings(sortedBookings);
       
@@ -73,7 +76,6 @@ export default function AdminPanel() {
   const refreshBookings = useCallback(async () => {
     try {
       const res = await axiosClient.get('/bookings/all');
-      // SORT LATEST BOOKINGS FIRST
       const sortedBookings = res.data.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
       setBookings(sortedBookings);
     } catch (error) {
@@ -133,7 +135,7 @@ export default function AdminPanel() {
     try {
       await axiosClient.patch(`/bookings/${id}/approve-payment`);
       toast.success('Payment approved! Booking is now confirmed.');
-      setSlipModalOpen(false); // Close modal
+      setSlipModalOpen(false);
       refreshBookings();
     } catch (error) {
       toast.error(error.response?.data?.message || 'Error approving payment');
@@ -283,6 +285,17 @@ export default function AdminPanel() {
     });
   }, [bookings, searchTerm, statusFilter]);
 
+  // 🚨 PAGINATION MATH
+  const indexOfLastItem = currentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  const currentItems = filteredBookings.slice(indexOfFirstItem, indexOfLastItem);
+  const totalPages = Math.ceil(filteredBookings.length / itemsPerPage);
+
+  // 🚨 RESET PAGE ON FILTER CHANGE
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, statusFilter, activeTab]);
+
   const filteredServices = useMemo(() => {
     if (!searchTerm) return services;
     return services.filter((s) =>
@@ -306,7 +319,7 @@ export default function AdminPanel() {
       case 'Pending':
         return 'bg-amber-500/10 text-amber-500 border-amber-500/30';
       case 'Confirmed':
-        return 'bg-red-600/10 text-red-500 border-red-600/30';
+        return 'bg-cyan-500/10 text-cyan-400 border-cyan-500/30'; // 🚨 Changed to Cyan
       case 'In Progress':
         return 'bg-blue-500/10 text-blue-400 border-blue-500/20';
       case 'Completed':
@@ -334,65 +347,36 @@ export default function AdminPanel() {
   return (
     <div className="min-h-screen bg-zinc-950 font-sans text-zinc-50 flex flex-col md:flex-row relative">
       
-      {/* SLIP VIEW MODAL (LARGER) */}
+      {/* SLIP VIEW MODAL */}
       {slipModalOpen && selectedSlipBooking && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-[fadeIn_0.2s_ease-out]">
           <div className="bg-zinc-900 border border-zinc-700 rounded-2xl w-full max-w-4xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
-            {/* Modal Header */}
             <div className="flex justify-between items-center p-4 border-b border-zinc-800 bg-zinc-950/50 shrink-0">
               <div>
                 <h3 className="text-lg font-bold text-white">Payment Slip Verification</h3>
                 <p className="text-xs text-zinc-400">Booking Ref: {selectedSlipBooking.booking_ref}</p>
               </div>
-              <button 
-                onClick={() => setSlipModalOpen(false)}
-                className="text-zinc-400 hover:text-red-500 p-2"
-              >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-                </svg>
+              <button onClick={() => setSlipModalOpen(false)} className="text-zinc-400 hover:text-red-500 p-2">
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
               </button>
             </div>
-
-            {/* Modal Image/PDF Viewer */}
             <div className="p-6 bg-zinc-950 flex justify-center items-center overflow-y-auto min-h-[400px]">
               {selectedSlipBooking.payment_slip?.toLowerCase().endsWith('.pdf') ? (
-                <iframe 
-                  src={selectedSlipBooking.payment_slip} 
-                  className="w-full h-[60vh] rounded-lg bg-white"
-                  title="Payment Slip PDF"
-                />
+                <iframe src={selectedSlipBooking.payment_slip} className="w-full h-[60vh] rounded-lg bg-white" title="Payment Slip PDF" />
               ) : (
-                <img 
-                  src={selectedSlipBooking.payment_slip} 
-                  alt="Payment Slip" 
-                  className="max-h-[60vh] w-auto object-contain rounded-lg shadow-lg border border-zinc-800"
-                />
+                <img src={selectedSlipBooking.payment_slip} alt="Payment Slip" className="max-h-[60vh] w-auto object-contain rounded-lg shadow-lg border border-zinc-800" />
               )}
             </div>
-
-            {/* Modal Footer (Actions) */}
             <div className="p-4 border-t border-zinc-800 bg-zinc-900 flex justify-between items-center shrink-0">
               <div className="text-sm">
                 <span className="text-zinc-400">Amount: </span>
                 <span className="font-bold text-white text-lg">LKR {selectedSlipBooking.total_price.toLocaleString()}</span>
               </div>
               <div className="flex gap-3">
-                <button
-                  onClick={() => setSlipModalOpen(false)}
-                  className="px-4 py-2 rounded-lg font-bold text-sm text-zinc-300 bg-zinc-800 hover:bg-zinc-700 transition-colors"
-                >
-                  Close
-                </button>
-                
+                <button onClick={() => setSlipModalOpen(false)} className="px-4 py-2 rounded-lg font-bold text-sm text-zinc-300 bg-zinc-800 hover:bg-zinc-700 transition-colors">Close</button>
                 {selectedSlipBooking.status === 'Pending' && (
-                  <button
-                    onClick={() => handleApprovePayment(selectedSlipBooking._id)}
-                    className="px-6 py-2 rounded-lg font-bold text-sm text-white bg-emerald-600 hover:bg-emerald-500 transition-colors shadow-lg shadow-emerald-600/20 flex items-center gap-2"
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
-                    </svg>
+                  <button onClick={() => handleApprovePayment(selectedSlipBooking._id)} className="px-6 py-2 rounded-lg font-bold text-sm text-white bg-emerald-600 hover:bg-emerald-500 transition-colors shadow-lg shadow-emerald-600/20 flex items-center gap-2">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" /></svg>
                     Approve Payment
                   </button>
                 )}
@@ -405,20 +389,10 @@ export default function AdminPanel() {
       {/* Mobile Header */}
       <div className="md:hidden bg-zinc-900 p-4 flex items-center justify-between sticky top-0 z-30 border-b border-zinc-800">
         <div className="flex items-center gap-3">
-          {/* 🚨 LOGO ADDED HERE */}
-          <img 
-            src="/logo.png" 
-            alt="Royal Service Center Logo" 
-            className="w-10 h-10 object-contain rounded-lg shadow-lg" 
-          />
-          <h2 className="text-lg font-black text-white uppercase tracking-widest">
-            ADMIN
-          </h2>
+          <img src="/logo.png" alt="Logo" className="w-10 h-10 object-contain rounded-lg shadow-lg" />
+          <h2 className="text-lg font-black text-white uppercase tracking-widest">ADMIN</h2>
         </div>
-        <button
-          onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-          className="text-zinc-400 hover:text-red-500 p-2"
-        >
+        <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="text-zinc-400 hover:text-red-500 p-2">
           <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             {isSidebarOpen ? (
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
@@ -431,90 +405,44 @@ export default function AdminPanel() {
 
       {/* Mobile Sidebar Backdrop */}
       {isSidebarOpen && (
-        <div 
-          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-30 md:hidden"
-          onClick={() => setIsSidebarOpen(false)}
-        ></div>
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-30 md:hidden" onClick={() => setIsSidebarOpen(false)}></div>
       )}
 
       {/* Sidebar */}
-      <div
-        className={`${
-          isSidebarOpen ? 'flex' : 'hidden'
-        } md:flex flex-col w-64 bg-zinc-900 border-r border-zinc-800 z-40 fixed md:sticky top-0 h-screen overflow-y-auto shrink-0 transition-transform duration-300`}
-      >
+      <div className={`${isSidebarOpen ? 'flex' : 'hidden'} md:flex flex-col w-64 bg-zinc-900 border-r border-zinc-800 z-40 fixed md:sticky top-0 h-screen overflow-y-auto shrink-0 transition-transform duration-300`}>
         <div className="p-6 pb-4">
           <div className="hidden md:flex items-center gap-3 mb-6 border-b border-zinc-800 pb-6">
-            {/* 🚨 LOGO ADDED HERE */}
-            <img 
-              src="/logo.png" 
-              alt="Royal Service Center Logo" 
-              className="w-10 h-10 object-contain rounded-lg shadow-lg" 
-            />
-            <h2 className="text-lg font-black text-white uppercase tracking-widest">
-              Admin Panel
-            </h2>
+            <img src="/logo.png" alt="Logo" className="w-10 h-10 object-contain rounded-lg shadow-lg" />
+            <h2 className="text-lg font-black text-white uppercase tracking-widest">Admin Panel</h2>
           </div>
 
           <nav className="space-y-2">
             <button
-              onClick={() => {
-                setActiveTab('bookings');
-                setIsSidebarOpen(false);
-                setSearchTerm('');
-                setStatusFilter('all');
-              }}
-              className={`w-full text-left px-4 py-3 rounded-xl font-bold text-sm transition-all ${
-                activeTab === 'bookings'
-                  ? 'bg-red-600 text-white shadow-lg shadow-red-600/25'
-                  : 'text-zinc-400 hover:bg-zinc-800 hover:text-white'
-              }`}
+              onClick={() => { setActiveTab('bookings'); setIsSidebarOpen(false); setSearchTerm(''); setStatusFilter('all'); }}
+              className={`w-full text-left px-4 py-3 rounded-xl font-bold text-sm transition-all ${activeTab === 'bookings' ? 'bg-red-600 text-white shadow-lg shadow-red-600/25' : 'text-zinc-400 hover:bg-zinc-800 hover:text-white'}`}
             >
               📋 Bookings
             </button>
             <button
-              onClick={() => {
-                setActiveTab('services');
-                setIsSidebarOpen(false);
-                setSearchTerm('');
-              }}
-              className={`w-full text-left px-4 py-3 rounded-xl font-bold text-sm transition-all ${
-                activeTab === 'services'
-                  ? 'bg-red-600 text-white shadow-lg shadow-red-600/25'
-                  : 'text-zinc-400 hover:bg-zinc-800 hover:text-white'
-              }`}
+              onClick={() => { setActiveTab('services'); setIsSidebarOpen(false); setSearchTerm(''); }}
+              className={`w-full text-left px-4 py-3 rounded-xl font-bold text-sm transition-all ${activeTab === 'services' ? 'bg-red-600 text-white shadow-lg shadow-red-600/25' : 'text-zinc-400 hover:bg-zinc-800 hover:text-white'}`}
             >
               🔧 Services
             </button>
             <button
-              onClick={() => {
-                setActiveTab('users');
-                setIsSidebarOpen(false);
-                setSearchTerm('');
-              }}
-              className={`w-full text-left px-4 py-3 rounded-xl font-bold text-sm transition-all ${
-                activeTab === 'users'
-                  ? 'bg-red-600 text-white shadow-lg shadow-red-600/25'
-                  : 'text-zinc-400 hover:bg-zinc-800 hover:text-white'
-              }`}
+              onClick={() => { setActiveTab('users'); setIsSidebarOpen(false); setSearchTerm(''); }}
+              className={`w-full text-left px-4 py-3 rounded-xl font-bold text-sm transition-all ${activeTab === 'users' ? 'bg-red-600 text-white shadow-lg shadow-red-600/25' : 'text-zinc-400 hover:bg-zinc-800 hover:text-white'}`}
             >
               👥 Users
             </button>
           </nav>
         </div>
 
-        {/* 🚨 Sidebar Footer pushed to the bottom securely */}
         <div className="mt-auto p-6 pt-4 border-t border-zinc-800/50 space-y-2">
-          <button
-            onClick={() => navigate('/')}
-            className="w-full text-left px-4 py-3 rounded-xl font-bold text-sm text-zinc-400 hover:bg-zinc-800 hover:text-white transition-all flex items-center gap-2"
-          >
+          <button onClick={() => navigate('/')} className="w-full text-left px-4 py-3 rounded-xl font-bold text-sm text-zinc-400 hover:bg-zinc-800 hover:text-white transition-all flex items-center gap-2">
             ← Home
           </button>
-          <button
-            onClick={handleLogout}
-            className="w-full border border-red-600/30 text-red-500 hover:bg-red-600 hover:text-white px-4 py-3 rounded-xl font-bold text-sm transition-all"
-          >
+          <button onClick={handleLogout} className="w-full border border-red-600/30 text-red-500 hover:bg-red-600 hover:text-white px-4 py-3 rounded-xl font-bold text-sm transition-all">
             Logout
           </button>
         </div>
@@ -527,21 +455,12 @@ export default function AdminPanel() {
           <div className="flex-1 relative">
             <input
               type="text"
-              placeholder={
-                activeTab === 'bookings'
-                  ? 'Search by ref, name, phone, or service...'
-                  : `Search ${activeTab}...`
-              }
+              placeholder={activeTab === 'bookings' ? 'Search by ref, name, phone, or service...' : `Search ${activeTab}...`}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full bg-zinc-900 border border-zinc-800 text-white p-3 pl-10 rounded-xl focus:border-red-600 focus:ring-1 focus:ring-red-600 focus:outline-none placeholder:text-zinc-600"
             />
-            <svg
-              className="w-5 h-5 text-zinc-500 absolute left-3 top-1/2 -translate-y-1/2"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
+            <svg className="w-5 h-5 text-zinc-500 absolute left-3 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
             </svg>
           </div>
@@ -566,155 +485,136 @@ export default function AdminPanel() {
         {/* BOOKINGS TAB */}
         {activeTab === 'bookings' && (
           <div>
-            <h3 className="text-2xl font-black text-white mb-2 uppercase tracking-tight">
-              Active Deployments
-            </h3>
-            <p className="text-zinc-400 mb-6">
-              Manage customer appointments and assign staff.
-            </p>
+            <h3 className="text-2xl font-black text-white mb-2 uppercase tracking-tight">Active Deployments</h3>
+            <p className="text-zinc-400 mb-6">Manage customer appointments and assign staff.</p>
 
             {loading.bookings ? (
               <LoadingSpinner />
             ) : (
-              <div className="bg-zinc-900 rounded-2xl border border-zinc-800 overflow-hidden">
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left whitespace-nowrap">
-                    <thead className="bg-zinc-950/60 text-zinc-400 text-xs font-bold uppercase tracking-wider">
-                      <tr>
-                        <th className="p-4">Reference</th>
-                        <th className="p-4">Customer</th>
-                        <th className="p-4">Schedule</th>
-                        <th className="p-4">Service</th>
-                        <th className="p-4">Assign Staff</th>
-                        <th className="p-4">Rating</th>
-                        <th className="p-4">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody className="text-sm">
-                      {filteredBookings.length === 0 ? (
+              <>
+                <div className="bg-zinc-900 rounded-2xl border border-zinc-800 overflow-hidden">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left whitespace-nowrap">
+                      <thead className="bg-zinc-950/60 text-zinc-400 text-xs font-bold uppercase tracking-wider">
                         <tr>
-                          <td colSpan="7" className="p-10 text-center text-zinc-500">
-                            No bookings found
-                          </td>
+                          <th className="p-4">Reference</th>
+                          <th className="p-4">Customer</th>
+                          <th className="p-4">Schedule</th>
+                          <th className="p-4">Service</th>
+                          <th className="p-4">Assign Staff</th>
+                          <th className="p-4">Rating</th>
+                          <th className="p-4">Actions</th>
                         </tr>
-                      ) : (
-                        filteredBookings.map((b) => (
-                          <tr key={b._id} className="hover:bg-zinc-800/50 transition-colors">
-                            {/* Reference */}
-                            <td className="p-4 border-b border-zinc-800">
-                              <div className="font-bold text-white">{b.booking_ref}</div>
-                              <span
-                                className={`text-[10px] px-2 py-1 rounded border font-bold uppercase tracking-wider ${getStatusStyle(
-                                  b.status
-                                )}`}
-                              >
-                                {b.status}
-                              </span>
-                            </td>
-
-                            {/* Customer */}
-                            <td className="p-4 border-b border-zinc-800">
-                              <div className="font-bold text-white">
-                                {b.user_id?.name || b.userData?.name || 'N/A'}
-                              </div>
-                              <div className="text-zinc-500 text-xs mt-0.5">
-                                {b.user_id?.phone || b.userData?.phone || 'No phone'}
-                              </div>
-                            </td>
-
-                            {/* Schedule */}
-                            <td className="p-4 border-b border-zinc-800">
-                              <div className="text-white">{b.booking_date}</div>
-                              <div className="text-zinc-500 text-xs">{b.booking_time}</div>
-                            </td>
-
-                            {/* Service */}
-                            <td className="p-4 border-b border-zinc-800">
-                              <div className="text-white">{b.service_id?.name || 'N/A'}</div>
-                              <div className="text-zinc-500 text-xs">
-                                {b.vehicleData?.reg_number}
-                              </div>
-                            </td>
-
-                            {/* Assign Staff */}
-                            <td className="p-4 border-b border-zinc-800">
-                              <select
-                                value={b.staff_id?._id || b.staff_id || ''}
-                                onChange={(e) => handleAssignStaff(b._id, e.target.value)}
-                                disabled={['Completed', 'Cancelled', 'Rejected'].includes(b.status)}
-                                className="bg-zinc-950 border border-zinc-800 text-zinc-300 p-2 rounded-lg text-xs focus:border-red-600 focus:outline-none disabled:opacity-50"
-                              >
-                                <option value="">Unassigned</option>
-                                {availableStaff.map((staff) => (
-                                  <option key={staff._id} value={staff._id}>
-                                    {staff.name}
-                                  </option>
-                                ))}
-                              </select>
-                            </td>
-
-                            {/* Rating */}
-                            <td className="p-4 border-b border-zinc-800">
-                              {b.rating ? (
-                                <div>
-                                  <div className="flex">
-                                    {[...Array(5)].map((_, i) => (
-                                      <svg key={i} className={`w-4 h-4 ${i < b.rating ? 'text-amber-400' : 'text-zinc-700'}`} fill="currentColor" viewBox="0 0 20 20">
-                                        <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                                      </svg>
-                                    ))}
-                                  </div>
-                                  {b.review_comment && (
-                                    <div className="text-xs text-zinc-400 mt-1 max-w-[200px] truncate" title={b.review_comment}>
-                                      "{b.review_comment}"
-                                    </div>
-                                  )}
-                                </div>
-                              ) : (
-                                <span className="text-zinc-600 text-xs">Not rated</span>
-                              )}
-                            </td>
-
-                            {/* Actions */}
-                            <td className="p-4 border-b border-zinc-800">
-                              <div className="flex gap-2">
-                                
-                                {/* View Slip Button opens the Modal */}
-                                {b.payment_slip && (
-                                  <button
-                                    onClick={() => openSlipModal(b)}
-                                    className="text-xs px-3 py-1.5 rounded bg-blue-500/10 text-blue-400 hover:bg-blue-600 hover:text-white transition-colors font-bold"
-                                  >
-                                    View Slip
-                                  </button>
-                                )}
-
-                                {/* Download PDF Button */}
-                                {b.status === 'Completed' && (
-                                  <button
-                                    onClick={() => handleDownloadRecord(b._id, b.booking_ref)}
-                                    className="text-xs px-3 py-1.5 rounded bg-emerald-500/10 text-emerald-400 hover:bg-emerald-600 hover:text-white transition-colors font-bold"
-                                  >
-                                    PDF
-                                  </button>
-                                )}
-
-                                {/* Delete Button */}
-                                <button
-                                  onClick={() => handleDeleteBooking(b._id)}
-                                  className="text-xs px-3 py-1.5 rounded bg-red-600/10 text-red-500 hover:bg-red-600 hover:text-white transition-colors font-bold"
-                                >
-                                  Delete
-                                </button>
-                              </div>
-                            </td>
+                      </thead>
+                      <tbody className="text-sm">
+                        {currentItems.length === 0 ? (
+                          <tr>
+                            <td colSpan="7" className="p-10 text-center text-zinc-500">No bookings found</td>
                           </tr>
-                        ))
-                      )}
-                    </tbody>
-                  </table>
+                        ) : (
+                          currentItems.map((b) => (
+                            <tr key={b._id} className="hover:bg-zinc-800/50 transition-colors">
+                              <td className="p-4 border-b border-zinc-800">
+                                <div className="font-bold text-white">{b.booking_ref}</div>
+                                <span className={`text-[10px] px-2 py-1 rounded border font-bold uppercase tracking-wider ${getStatusStyle(b.status)}`}>
+                                  {b.status}
+                                </span>
+                              </td>
+                              <td className="p-4 border-b border-zinc-800">
+                                <div className="font-bold text-white">{b.user_id?.name || b.userData?.name || 'N/A'}</div>
+                                <div className="text-zinc-500 text-xs mt-0.5">{b.user_id?.phone || b.userData?.phone || 'No phone'}</div>
+                              </td>
+                              <td className="p-4 border-b border-zinc-800">
+                                <div className="text-white">{b.booking_date}</div>
+                                <div className="text-zinc-500 text-xs">{b.booking_time}</div>
+                              </td>
+                              <td className="p-4 border-b border-zinc-800">
+                                <div className="text-white">{b.service_id?.name || 'N/A'}</div>
+                                <div className="text-zinc-500 text-xs">{b.vehicleData?.reg_number}</div>
+                              </td>
+                              <td className="p-4 border-b border-zinc-800">
+                                <select
+                                  value={b.staff_id?._id || b.staff_id || ''}
+                                  onChange={(e) => handleAssignStaff(b._id, e.target.value)}
+                                  disabled={['Completed', 'Cancelled', 'Rejected'].includes(b.status)}
+                                  className="bg-zinc-950 border border-zinc-800 text-zinc-300 p-2 rounded-lg text-xs focus:border-red-600 focus:outline-none disabled:opacity-50"
+                                >
+                                  <option value="">Unassigned</option>
+                                  {availableStaff.map((staff) => (
+                                    <option key={staff._id} value={staff._id}>{staff.name}</option>
+                                  ))}
+                                </select>
+                              </td>
+                              <td className="p-4 border-b border-zinc-800">
+                                {b.rating ? (
+                                  <div>
+                                    <div className="flex">
+                                      {[...Array(5)].map((_, i) => (
+                                        <svg key={i} className={`w-4 h-4 ${i < b.rating ? 'text-amber-400' : 'text-zinc-700'}`} fill="currentColor" viewBox="0 0 20 20">
+                                          <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                                        </svg>
+                                      ))}
+                                    </div>
+                                    {b.review_comment && (
+                                      <div className="text-xs text-zinc-400 mt-1 max-w-[200px] truncate" title={b.review_comment}>
+                                        "{b.review_comment}"
+                                      </div>
+                                    )}
+                                  </div>
+                                ) : (
+                                  <span className="text-zinc-600 text-xs">Not rated</span>
+                                )}
+                              </td>
+                              <td className="p-4 border-b border-zinc-800">
+                                <div className="flex gap-2">
+                                  {b.payment_slip && (
+                                    <button onClick={() => openSlipModal(b)} className="text-xs px-3 py-1.5 rounded bg-blue-500/10 text-blue-400 hover:bg-blue-600 hover:text-white transition-colors font-bold">
+                                      View Slip
+                                    </button>
+                                  )}
+                                  {b.status === 'Completed' && (
+                                    <button onClick={() => handleDownloadRecord(b._id, b.booking_ref)} className="text-xs px-3 py-1.5 rounded bg-emerald-500/10 text-emerald-400 hover:bg-emerald-600 hover:text-white transition-colors font-bold">
+                                      PDF
+                                    </button>
+                                  )}
+                                  <button onClick={() => handleDeleteBooking(b._id)} className="text-xs px-3 py-1.5 rounded bg-red-600/10 text-red-500 hover:bg-red-600 hover:text-white transition-colors font-bold">
+                                    Delete
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
-              </div>
+
+                {/* 🚨 PAGINATION CONTROLS FOR BOOKINGS */}
+                {totalPages > 1 && (
+                  <div className="flex items-center justify-between mt-4 bg-zinc-900 border border-zinc-800 rounded-xl p-3">
+                    <span className="text-sm text-zinc-400">
+                      Showing {indexOfFirstItem + 1}-{Math.min(indexOfLastItem, filteredBookings.length)} of {filteredBookings.length} bookings
+                    </span>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                        disabled={currentPage === 1}
+                        className="px-4 py-2 rounded-lg text-sm font-bold bg-zinc-800 text-white hover:bg-zinc-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      >
+                        Previous
+                      </button>
+                      <button
+                        onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                        disabled={currentPage === totalPages}
+                        className="px-4 py-2 rounded-lg text-sm font-bold bg-zinc-800 text-white hover:bg-zinc-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      >
+                        Next
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </>
             )}
           </div>
         )}
@@ -722,79 +622,28 @@ export default function AdminPanel() {
         {/* SERVICES TAB */}
         {activeTab === 'services' && (
           <div>
-            <h3 className="text-2xl font-black text-white mb-2 uppercase tracking-tight">
-              Service Catalog
-            </h3>
+            <h3 className="text-2xl font-black text-white mb-2 uppercase tracking-tight">Service Catalog</h3>
             <p className="text-zinc-400 mb-6">Manage services and pricing.</p>
 
-            {/* Service Form */}
-            <form
-              onSubmit={handleSubmitService}
-              className="bg-zinc-900 p-6 rounded-2xl border border-zinc-800 mb-6"
-            >
+            <form onSubmit={handleSubmitService} className="bg-zinc-900 p-6 rounded-2xl border border-zinc-800 mb-6">
               <h4 className="text-sm font-bold text-zinc-500 uppercase mb-4 tracking-wider">
                 {editingServiceId ? 'Edit Service' : 'Add New Service'}
               </h4>
               <div className="grid grid-cols-1 gap-4">
-                <input
-                  type="text"
-                  placeholder="Service Name"
-                  required
-                  value={newService.name}
-                  onChange={(e) => setNewService({ ...newService, name: e.target.value })}
-                  className="bg-zinc-950 border border-zinc-800 text-white p-3 rounded-xl focus:border-red-600 focus:ring-1 focus:ring-red-600 focus:outline-none placeholder:text-zinc-600"
-                />
+                <input type="text" placeholder="Service Name" required value={newService.name} onChange={(e) => setNewService({ ...newService, name: e.target.value })} className="bg-zinc-950 border border-zinc-800 text-white p-3 rounded-xl focus:border-red-600 focus:ring-1 focus:ring-red-600 focus:outline-none placeholder:text-zinc-600" />
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <input
-                    type="number"
-                    placeholder="Car Price"
-                    required
-                    value={newService.price_car}
-                    onChange={(e) => setNewService({ ...newService, price_car: e.target.value })}
-                    className="bg-zinc-950 border border-zinc-800 text-white p-3 rounded-xl focus:border-red-600 focus:outline-none placeholder:text-zinc-600"
-                  />
-                  <input
-                    type="number"
-                    placeholder="SUV Price"
-                    required
-                    value={newService.price_suv}
-                    onChange={(e) => setNewService({ ...newService, price_suv: e.target.value })}
-                    className="bg-zinc-950 border border-zinc-800 text-white p-3 rounded-xl focus:border-red-600 focus:outline-none placeholder:text-zinc-600"
-                  />
-                  <input
-                    type="number"
-                    placeholder="Van Price"
-                    required
-                    value={newService.price_van}
-                    onChange={(e) => setNewService({ ...newService, price_van: e.target.value })}
-                    className="bg-zinc-950 border border-zinc-800 text-white p-3 rounded-xl focus:border-red-600 focus:outline-none placeholder:text-zinc-600"
-                  />
+                  <input type="number" placeholder="Car Price" required value={newService.price_car} onChange={(e) => setNewService({ ...newService, price_car: e.target.value })} className="bg-zinc-950 border border-zinc-800 text-white p-3 rounded-xl focus:border-red-600 focus:outline-none placeholder:text-zinc-600" />
+                  <input type="number" placeholder="SUV Price" required value={newService.price_suv} onChange={(e) => setNewService({ ...newService, price_suv: e.target.value })} className="bg-zinc-950 border border-zinc-800 text-white p-3 rounded-xl focus:border-red-600 focus:outline-none placeholder:text-zinc-600" />
+                  <input type="number" placeholder="Van Price" required value={newService.price_van} onChange={(e) => setNewService({ ...newService, price_van: e.target.value })} className="bg-zinc-950 border border-zinc-800 text-white p-3 rounded-xl focus:border-red-600 focus:outline-none placeholder:text-zinc-600" />
                 </div>
-                <textarea
-                  placeholder="Description"
-                  required
-                  value={newService.description}
-                  onChange={(e) => setNewService({ ...newService, description: e.target.value })}
-                  rows="3"
-                  className="bg-zinc-950 border border-zinc-800 text-white p-3 rounded-xl focus:border-red-600 focus:outline-none resize-none placeholder:text-zinc-600"
-                />
+                <textarea placeholder="Description" required value={newService.description} onChange={(e) => setNewService({ ...newService, description: e.target.value })} rows="3" className="bg-zinc-950 border border-zinc-800 text-white p-3 rounded-xl focus:border-red-600 focus:outline-none resize-none placeholder:text-zinc-600" />
                 <div className="flex gap-4">
                   {editingServiceId && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setEditingServiceId(null);
-                        setNewService({ name: '', price_car: '', price_suv: '', price_van: '', description: '' });
-                      }}
-                      className="flex-1 bg-zinc-800 hover:bg-zinc-700 text-white font-bold py-3 rounded-xl"
-                    >
+                    <button type="button" onClick={() => { setEditingServiceId(null); setNewService({ name: '', price_car: '', price_suv: '', price_van: '', description: '' }); }} className="flex-1 bg-zinc-800 hover:bg-zinc-700 text-white font-bold py-3 rounded-xl">
                       Cancel
                     </button>
                   )}
-                  <button
-                    type="submit"
-                    className="flex-1 bg-red-600 hover:bg-red-700 text-white font-bold py-3 rounded-xl shadow-lg shadow-red-600/20"
-                  >
+                  <button type="submit" className="flex-1 bg-red-600 hover:bg-red-700 text-white font-bold py-3 rounded-xl shadow-lg shadow-red-600/20">
                     {editingServiceId ? 'Update' : 'Create'}
                   </button>
                 </div>
@@ -818,9 +667,7 @@ export default function AdminPanel() {
                     <tbody className="text-sm">
                       {filteredServices.map((svc) => (
                         <tr key={svc._id} className="hover:bg-zinc-800/50 transition-colors">
-                          <td className="p-4 border-b border-zinc-800 font-bold text-white">
-                            {svc.name}
-                          </td>
+                          <td className="p-4 border-b border-zinc-800 font-bold text-white">{svc.name}</td>
                           <td className="p-4 border-b border-zinc-800">
                             {typeof svc.price === 'object' ? (
                               <div className="flex flex-wrap gap-2 text-xs text-zinc-300">
@@ -829,42 +676,19 @@ export default function AdminPanel() {
                                 <span>Van: {svc.price?.Van?.toLocaleString()}</span>
                               </div>
                             ) : (
-                              <span className="text-zinc-300">
-                                {svc.price?.toLocaleString()}
-                              </span>
+                              <span className="text-zinc-300">{svc.price?.toLocaleString()}</span>
                             )}
                           </td>
                           <td className="p-4 border-b border-zinc-800">
-                            <span
-                              className={`px-2 py-1 rounded text-xs font-bold uppercase tracking-wider ${
-                                svc.is_active
-                                  ? 'bg-emerald-500/10 text-emerald-400'
-                                  : 'bg-zinc-800 text-zinc-400'
-                              }`}
-                            >
+                            <span className={`px-2 py-1 rounded text-xs font-bold uppercase tracking-wider ${svc.is_active ? 'bg-emerald-500/10 text-emerald-400' : 'bg-zinc-800 text-zinc-400'}`}>
                               {svc.is_active ? 'Active' : 'Inactive'}
                             </span>
                           </td>
                           <td className="p-4 border-b border-zinc-800">
                             <div className="flex gap-2">
-                              <button
-                                onClick={() => handleEditService(svc)}
-                                className="text-xs px-3 py-1.5 rounded bg-red-600/10 text-red-500 hover:bg-red-600 hover:text-white transition-colors font-bold"
-                              >
-                                Edit
-                              </button>
-                              <button
-                                onClick={() => handleToggleService(svc._id, svc.is_active)}
-                                className="text-xs px-3 py-1.5 rounded bg-zinc-800 text-zinc-400 hover:bg-zinc-700 hover:text-white transition-colors font-bold"
-                              >
-                                Toggle
-                              </button>
-                              <button
-                                onClick={() => handleDeleteService(svc._id)}
-                                className="text-xs px-3 py-1.5 rounded bg-zinc-800 text-zinc-500 hover:bg-red-600 hover:text-white transition-colors font-bold"
-                              >
-                                Delete
-                              </button>
+                              <button onClick={() => handleEditService(svc)} className="text-xs px-3 py-1.5 rounded bg-red-600/10 text-red-500 hover:bg-red-600 hover:text-white transition-colors font-bold">Edit</button>
+                              <button onClick={() => handleToggleService(svc._id, svc.is_active)} className="text-xs px-3 py-1.5 rounded bg-zinc-800 text-zinc-400 hover:bg-zinc-700 hover:text-white transition-colors font-bold">Toggle</button>
+                              <button onClick={() => handleDeleteService(svc._id)} className="text-xs px-3 py-1.5 rounded bg-zinc-800 text-zinc-500 hover:bg-red-600 hover:text-white transition-colors font-bold">Delete</button>
                             </div>
                           </td>
                         </tr>
@@ -880,58 +704,17 @@ export default function AdminPanel() {
         {/* USERS TAB */}
         {activeTab === 'users' && (
           <div>
-            <h3 className="text-2xl font-black text-white mb-2 uppercase tracking-tight">
-              User Management
-            </h3>
+            <h3 className="text-2xl font-black text-white mb-2 uppercase tracking-tight">User Management</h3>
             <p className="text-zinc-400 mb-6">Manage accounts and staff.</p>
 
-            {/* Create Staff Form */}
-            <form
-              onSubmit={handleCreateStaff}
-              className="bg-zinc-900 p-6 rounded-2xl border border-zinc-800 mb-6"
-            >
-              <h4 className="text-sm font-bold text-zinc-500 uppercase mb-4 tracking-wider">
-                Create Staff Account
-              </h4>
+            <form onSubmit={handleCreateStaff} className="bg-zinc-900 p-6 rounded-2xl border border-zinc-800 mb-6">
+              <h4 className="text-sm font-bold text-zinc-500 uppercase mb-4 tracking-wider">Create Staff Account</h4>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <input
-                  type="text"
-                  placeholder="Full Name"
-                  required
-                  value={newStaff.name}
-                  onChange={(e) => setNewStaff({ ...newStaff, name: e.target.value })}
-                  className="bg-zinc-950 border border-zinc-800 text-white p-3 rounded-xl focus:border-red-600 focus:outline-none placeholder:text-zinc-600"
-                />
-                <input
-                  type="email"
-                  placeholder="Email"
-                  required
-                  value={newStaff.email}
-                  onChange={(e) => setNewStaff({ ...newStaff, email: e.target.value })}
-                  className="bg-zinc-950 border border-zinc-800 text-white p-3 rounded-xl focus:border-red-600 focus:outline-none placeholder:text-zinc-600"
-                />
-                <input
-                  type="tel"
-                  placeholder="Phone"
-                  required
-                  value={newStaff.phone}
-                  onChange={(e) => setNewStaff({ ...newStaff, phone: e.target.value })}
-                  className="bg-zinc-950 border border-zinc-800 text-white p-3 rounded-xl focus:border-red-600 focus:outline-none placeholder:text-zinc-600"
-                />
-                <input
-                  type="password"
-                  placeholder="Password"
-                  required
-                  value={newStaff.password}
-                  onChange={(e) => setNewStaff({ ...newStaff, password: e.target.value })}
-                  className="bg-zinc-950 border border-zinc-800 text-white p-3 rounded-xl focus:border-red-600 focus:outline-none placeholder:text-zinc-600"
-                />
-                <button
-                  type="submit"
-                  className="col-span-full bg-red-600 hover:bg-red-700 text-white font-bold py-3 rounded-xl shadow-lg shadow-red-600/20"
-                >
-                  Create Staff
-                </button>
+                <input type="text" placeholder="Full Name" required value={newStaff.name} onChange={(e) => setNewStaff({ ...newStaff, name: e.target.value })} className="bg-zinc-950 border border-zinc-800 text-white p-3 rounded-xl focus:border-red-600 focus:outline-none placeholder:text-zinc-600" />
+                <input type="email" placeholder="Email" required value={newStaff.email} onChange={(e) => setNewStaff({ ...newStaff, email: e.target.value })} className="bg-zinc-950 border border-zinc-800 text-white p-3 rounded-xl focus:border-red-600 focus:outline-none placeholder:text-zinc-600" />
+                <input type="tel" placeholder="Phone" required value={newStaff.phone} onChange={(e) => setNewStaff({ ...newStaff, phone: e.target.value })} className="bg-zinc-950 border border-zinc-800 text-white p-3 rounded-xl focus:border-red-600 focus:outline-none placeholder:text-zinc-600" />
+                <input type="password" placeholder="Password" required value={newStaff.password} onChange={(e) => setNewStaff({ ...newStaff, password: e.target.value })} className="bg-zinc-950 border border-zinc-800 text-white p-3 rounded-xl focus:border-red-600 focus:outline-none placeholder:text-zinc-600" />
+                <button type="submit" className="col-span-full bg-red-600 hover:bg-red-700 text-white font-bold py-3 rounded-xl shadow-lg shadow-red-600/20">Create Staff</button>
               </div>
             </form>
 
@@ -957,39 +740,18 @@ export default function AdminPanel() {
                             <div className="text-zinc-500 text-xs">{u.email}</div>
                           </td>
                           <td className="p-4 border-b border-zinc-800">
-                            <span
-                              className={`px-2 py-1 rounded text-xs font-bold uppercase tracking-wider ${
-                                u.role === 'admin'
-                                  ? 'bg-amber-500/20 text-amber-400'
-                                  : u.role === 'staff'
-                                  ? 'bg-red-600/15 text-red-500'
-                                  : 'bg-zinc-800 text-zinc-400'
-                              }`}
-                            >
+                            <span className={`px-2 py-1 rounded text-xs font-bold uppercase tracking-wider ${u.role === 'admin' ? 'bg-amber-500/20 text-amber-400' : u.role === 'staff' ? 'bg-red-600/15 text-red-500' : 'bg-zinc-800 text-zinc-400'}`}>
                               {u.role}
                             </span>
                           </td>
                           <td className="p-4 border-b border-zinc-800">
-                            <span
-                              className={`px-2 py-1 rounded text-xs font-bold uppercase tracking-wider ${
-                                u.status === 1
-                                  ? 'bg-emerald-500/10 text-emerald-400'
-                                  : 'bg-zinc-800 text-zinc-400'
-                              }`}
-                            >
+                            <span className={`px-2 py-1 rounded text-xs font-bold uppercase tracking-wider ${u.status === 1 ? 'bg-emerald-500/10 text-emerald-400' : 'bg-zinc-800 text-zinc-400'}`}>
                               {u.status === 1 ? 'Active' : 'Suspended'}
                             </span>
                           </td>
                           <td className="p-4 border-b border-zinc-800">
                             {u.role !== 'admin' && (
-                              <button
-                                onClick={() => handleToggleUserStatus(u._id, u.status)}
-                                className={`text-xs px-3 py-1.5 rounded font-bold transition-colors ${
-                                  u.status === 1
-                                    ? 'bg-red-600/10 text-red-500 hover:bg-red-600 hover:text-white'
-                                    : 'bg-emerald-500/10 text-emerald-400 hover:bg-emerald-600 hover:text-white'
-                                }`}
-                              >
+                              <button onClick={() => handleToggleUserStatus(u._id, u.status)} className={`text-xs px-3 py-1.5 rounded font-bold transition-colors ${u.status === 1 ? 'bg-red-600/10 text-red-500 hover:bg-red-600 hover:text-white' : 'bg-emerald-500/10 text-emerald-400 hover:bg-emerald-600 hover:text-white'}`}>
                                 {u.status === 1 ? 'Suspend' : 'Activate'}
                               </button>
                             )}
@@ -1006,15 +768,9 @@ export default function AdminPanel() {
       </div>
 
       {/* MODERN FLOATING CHAT BUTTON */}
-      <button
-        onClick={() => navigate('/chat')}
-        className="fixed bottom-6 right-6 z-40 group"
-        aria-label="Chat with support"
-        title="Chat with support"
-      >
+      <button onClick={() => navigate('/chat')} className="fixed bottom-6 right-6 z-40 group">
         <span className="absolute inset-0 rounded-full bg-red-600/30 animate-ping opacity-75"></span>
         <span className="absolute inset-0 rounded-full bg-red-600/20 animate-pulse"></span>
-
         <span className="relative flex items-center gap-2 bg-gradient-to-br from-red-500 via-red-600 to-red-700 hover:from-red-600 hover:via-red-700 hover:to-red-800 text-white pl-3 pr-4 py-3 rounded-full shadow-2xl shadow-red-600/40 hover:shadow-red-600/60 transition-all duration-300 hover:scale-105">
           <span className="relative w-8 h-8 rounded-full bg-white/15 backdrop-blur-sm flex items-center justify-center flex-shrink-0">
             <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 24 24">
@@ -1022,20 +778,10 @@ export default function AdminPanel() {
             </svg>
             <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-400 border-2 border-red-600"></span>
           </span>
-
-          <span className="text-xs font-black tracking-widest uppercase whitespace-nowrap">
-            Chat
-          </span>
-
+          <span className="text-xs font-black tracking-widest uppercase whitespace-nowrap">Chat</span>
           <span className="absolute inset-0 rounded-full bg-gradient-to-r from-transparent via-white/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"></span>
         </span>
-
-        <span className="hidden md:block absolute right-full mr-4 top-1/2 -translate-y-1/2 bg-zinc-900 text-white text-xs font-bold px-3 py-2 rounded-lg whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none shadow-xl border border-zinc-800">
-          Chat with Support
-          <span className="absolute left-full top-1/2 -translate-y-1/2 border-8 border-transparent border-l-zinc-900"></span>
-        </span>
       </button>
-
     </div>
   );
 }

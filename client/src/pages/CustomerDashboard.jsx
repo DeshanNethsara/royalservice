@@ -14,6 +14,10 @@ export default function CustomerDashboard() {
   const [downloadingId, setDownloadingId] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
 
+  // 🚨 NEW: Pagination State
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
+
   // Rating Modal States
   const [isRatingModalOpen, setIsRatingModalOpen] = useState(false);
   const [selectedBookingForRating, setSelectedBookingForRating] = useState(null);
@@ -194,6 +198,7 @@ export default function CustomerDashboard() {
     return bookings.filter((b) => b.status === status).length;
   };
 
+  // 🚨 SORTING & FILTERING
   const filteredBookings = useMemo(() => {
     let filtered = bookings;
 
@@ -237,6 +242,17 @@ export default function CustomerDashboard() {
     });
 
   }, [bookings, activeTab, searchTerm]);
+
+  // 🚨 PAGINATION MATH
+  const indexOfLastItem = currentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  const currentItems = filteredBookings.slice(indexOfFirstItem, indexOfLastItem);
+  const totalPages = Math.ceil(filteredBookings.length / itemsPerPage);
+
+  // 🚨 RESET PAGE ON TAB/SEARCH CHANGE
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [activeTab, searchTerm]);
 
   const getStatusStyle = (status) => {
     switch (status) {
@@ -430,107 +446,133 @@ export default function CustomerDashboard() {
 
           ) : (
             
-            /* Clean List View */
-            <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
-              <div className="divide-y divide-zinc-800/50">
-                {filteredBookings.map((booking) => {
-                  const canCancel = canCancelBooking(booking);
-                  const isCompleted = booking.status === 'Completed';
-                  const isActionable = (activeTab === 'Upcoming' || activeTab === 'All') && ['Pending', 'Confirmed'].includes(booking.status);
+            <>
+              {/* Clean List View */}
+              <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
+                <div className="divide-y divide-zinc-800/50">
+                  {currentItems.map((booking) => {
+                    const canCancel = canCancelBooking(booking);
+                    const isCompleted = booking.status === 'Completed';
+                    const isActionable = (activeTab === 'Upcoming' || activeTab === 'All') && ['Pending', 'Confirmed'].includes(booking.status);
 
-                  return (
-                    <div
-                      key={booking._id}
-                      className="p-5 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 hover:bg-zinc-800/30 transition-colors"
-                    >
-                      
-                      {/* Left Section: Ref & Status */}
-                      <div className="w-full lg:w-48 shrink-0">
-                        <div className="font-bold text-white text-sm tracking-wider">{booking.booking_ref}</div>
-                        <div className={`text-xs font-bold uppercase mt-1 ${getStatusStyle(booking.status)}`}>
-                          {booking.status}
-                        </div>
-                      </div>
-
-                      {/* Middle Section: Details */}
-                      <div className="flex-1 w-full grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div>
-                          <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider mb-0.5">Service</p>
-                          <p className="text-zinc-200 text-sm font-medium">{booking.service_id?.name || 'N/A'}</p>
-                        </div>
-                        <div>
-                          <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider mb-0.5">Vehicle</p>
-                          <p className="text-zinc-200 text-sm font-medium">
-                            {booking.vehicle_id?.reg_number?.toUpperCase() || 'N/A'}
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider mb-0.5">Schedule</p>
-                          <p className="text-zinc-200 text-sm font-medium">{booking.booking_date}</p>
-                          <p className="text-zinc-500 text-xs">{booking.booking_time}</p>
-                        </div>
-                      </div>
-
-                      {/* Right Section: Actions (Fixed Width for Alignment) */}
-                      <div className="w-full lg:w-48 shrink-0 flex items-center justify-end gap-3">
+                    return (
+                      <div
+                        key={booking._id}
+                        className="p-5 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 hover:bg-zinc-800/30 transition-colors"
+                      >
                         
-                        {isActionable && (
-                          <div className="flex flex-col items-end w-full">
-                            <button
-                              onClick={() => handleCancel(booking)}
-                              disabled={!canCancel || cancellingId === booking._id}
-                              className={`px-4 py-2 rounded-lg text-xs font-bold tracking-wider transition-all w-full lg:w-auto ${
-                                canCancel
-                                  ? 'border border-red-600/40 text-red-500 hover:bg-red-600/10'
-                                  : 'border border-zinc-800 text-zinc-600 cursor-not-allowed opacity-50'
-                              }`}
-                            >
-                              {cancellingId === booking._id ? '...' : 'CANCEL'}
-                            </button>
-                            {!canCancel && (
-                              <span className="text-[10px] text-amber-500 mt-1 max-w-[150px] text-right">
-                                {getCancellationMessage(booking)}
-                              </span>
-                            )}
+                        {/* Left Section: Ref & Status */}
+                        <div className="w-full lg:w-48 shrink-0">
+                          <div className="font-bold text-white text-sm tracking-wider">{booking.booking_ref}</div>
+                          <div className={`text-xs font-bold uppercase mt-1 ${getStatusStyle(booking.status)}`}>
+                            {booking.status}
                           </div>
-                        )}
-                        
-                        {isCompleted && (
-                          <>
-                            {!booking.rating && (
+                        </div>
+
+                        {/* Middle Section: Details */}
+                        <div className="flex-1 w-full grid grid-cols-1 md:grid-cols-3 gap-4">
+                          <div>
+                            <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider mb-0.5">Service</p>
+                            <p className="text-zinc-200 text-sm font-medium">{booking.service_id?.name || 'N/A'}</p>
+                          </div>
+                          <div>
+                            <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider mb-0.5">Vehicle</p>
+                            <p className="text-zinc-200 text-sm font-medium">
+                              {booking.vehicle_id?.reg_number?.toUpperCase() || 'N/A'}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider mb-0.5">Schedule</p>
+                            <p className="text-zinc-200 text-sm font-medium">{booking.booking_date}</p>
+                            <p className="text-zinc-500 text-xs">{booking.booking_time}</p>
+                          </div>
+                        </div>
+
+                        {/* Right Section: Actions */}
+                        <div className="w-full lg:w-48 shrink-0 flex items-center justify-end gap-3">
+                          
+                          {isActionable && (
+                            <div className="flex flex-col items-end w-full">
                               <button
-                                onClick={() => openRatingModal(booking)}
-                                className="px-4 py-2 bg-amber-500/10 text-amber-500 border border-amber-500/30 hover:bg-amber-500 hover:text-white rounded-lg text-xs font-bold tracking-wider transition-all"
+                                onClick={() => handleCancel(booking)}
+                                disabled={!canCancel || cancellingId === booking._id}
+                                className={`px-4 py-2 rounded-lg text-xs font-bold tracking-wider transition-all w-full lg:w-auto ${
+                                  canCancel
+                                    ? 'border border-red-600/40 text-red-500 hover:bg-red-600/10'
+                                    : 'border border-zinc-800 text-zinc-600 cursor-not-allowed opacity-50'
+                                }`}
                               >
-                                RATE
+                                {cancellingId === booking._id ? '...' : 'CANCEL'}
                               </button>
-                            )}
-                            
-                            <button
-                              onClick={() => handleDownloadRecord(booking)}
-                              disabled={downloadingId === booking._id}
-                              className="flex items-center gap-2 px-4 py-2 text-xs font-bold tracking-wider text-zinc-300 bg-transparent border border-zinc-600 rounded-lg hover:bg-zinc-800 transition-colors disabled:opacity-50"
-                            >
-                              {downloadingId === booking._id ? (
-                                '...'
-                              ) : (
-                                <>
-                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                                  </svg>
-                                  Download
-                                </>
+                              {!canCancel && (
+                                <span className="text-[10px] text-amber-500 mt-1 max-w-[150px] text-right">
+                                  {getCancellationMessage(booking)}
+                                </span>
                               )}
-                            </button>
-                            {/* RATING DISPLAY REMOVED HERE */}
-                          </>
-                        )}
+                            </div>
+                          )}
+                          
+                          {isCompleted && (
+                            <>
+                              {!booking.rating && (
+                                <button
+                                  onClick={() => openRatingModal(booking)}
+                                  className="px-4 py-2 bg-amber-500/10 text-amber-500 border border-amber-500/30 hover:bg-amber-500 hover:text-white rounded-lg text-xs font-bold tracking-wider transition-all"
+                                >
+                                  RATE
+                                </button>
+                              )}
+                              
+                              <button
+                                onClick={() => handleDownloadRecord(booking)}
+                                disabled={downloadingId === booking._id}
+                                className="flex items-center gap-2 px-4 py-2 text-xs font-bold tracking-wider text-zinc-300 bg-transparent border border-zinc-600 rounded-lg hover:bg-zinc-800 transition-colors disabled:opacity-50"
+                              >
+                                {downloadingId === booking._id ? (
+                                  '...'
+                                ) : (
+                                  <>
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                                    </svg>
+                                    Download
+                                  </>
+                                )}
+                              </button>
+                            </>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })}
+                </div>
               </div>
-            </div>
+
+              {/* 🚨 NEW: PAGINATION CONTROLS */}
+              {totalPages > 1 && (
+                <div className="flex items-center justify-between mt-6 bg-zinc-900 border border-zinc-800 rounded-xl p-3">
+                  <span className="text-sm text-zinc-400">
+                    Page <span className="font-bold text-white">{currentPage}</span> of {totalPages}
+                  </span>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                      disabled={currentPage === 1}
+                      className="px-4 py-2 rounded-lg text-sm font-bold bg-zinc-800 text-white hover:bg-zinc-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    >
+                      Previous
+                    </button>
+                    <button
+                      onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                      disabled={currentPage === totalPages}
+                      className="px-4 py-2 rounded-lg text-sm font-bold bg-zinc-800 text-white hover:bg-zinc-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    >
+                      Next
+                    </button>
+                  </div>
+                </div>
+              )}
+            </>
           )}
         </div>
       </main>
