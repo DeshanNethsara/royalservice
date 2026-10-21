@@ -264,6 +264,7 @@ export default function BookingFlow() {
       toast.success('Booking confirmed!');
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (err) {
+      // 🚨 The rate limit error from the backend will be displayed here
       toast.error(err.response?.data?.message || 'Error creating booking');
       if (err.response?.status === 409) { fetchBookingsForDate(slot.date); setStep(3); }
     } finally {
@@ -444,7 +445,8 @@ export default function BookingFlow() {
 
                 <div className="grid grid-cols-2 gap-4 md:gap-5">
                   <div>
-                    <label className="block text-xs md:text-sm font-bold text-zinc-600 mb-1.5 md:mb-2 uppercase">Year</label>
+                    {/* 🚨 UPDATED LABEL: Manufacture Year */}
+                    <label className="block text-xs md:text-sm font-bold text-zinc-600 mb-1.5 md:mb-2 uppercase">Manufacture Year</label>
                     <input
                       type="number" placeholder="2020" value={vehicle.manufacture_year}
                       onChange={(e) => { setVehicle({ ...vehicle, manufacture_year: e.target.value }); if (errors.manufacture_year) setErrors({ ...errors, manufacture_year: null }); }}
@@ -454,7 +456,8 @@ export default function BookingFlow() {
                     {errors.manufacture_year && <p className="text-red-600 text-[10px] md:text-xs mt-1">{errors.manufacture_year}</p>}
                   </div>
                   <div>
-                    <label className="block text-xs md:text-sm font-bold text-zinc-600 mb-1.5 md:mb-2 uppercase">Mileage (km)</label>
+                    {/* 🚨 UPDATED LABEL: Current Mileage */}
+                    <label className="block text-xs md:text-sm font-bold text-zinc-600 mb-1.5 md:mb-2 uppercase">Current Mileage (km)</label>
                     <input
                       type="number" placeholder="85000" value={vehicle.mileage}
                       onChange={(e) => { setVehicle({ ...vehicle, mileage: e.target.value }); if (errors.mileage) setErrors({ ...errors, mileage: null }); }}

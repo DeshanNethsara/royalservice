@@ -59,7 +59,13 @@ export const login = async (req, res) => {
       });
     }
 
-    // 3. Success
+    // 3. Success - Reset any password reset backoff tracking
+    if (user.resetPasswordAttempts > 0) {
+      user.resetPasswordLastSent = null;
+      user.resetPasswordAttempts = 0;
+      await user.save();
+    }
+
     res.json({
       _id: user._id,
       name: user.name,
@@ -86,6 +92,36 @@ export const forgotPassword = async (req, res) => {
       return res.status(404).json({ message: 'There is no user with that email' });
     }
 
+    // ==========================================================
+    // 🚨 EXPONENTIAL BACKOFF LOGIC
+    // ==========================================================
+    const now = new Date();
+    const lastSent = user.resetPasswordLastSent;
+    const attempts = user.resetPasswordAttempts || 0;
+
+    if (lastSent) {
+      // Calculate the wait time in milliseconds.
+      // 1st retry: 1 min (60,000ms)
+      // 2nd retry: 5 min (300,000ms)
+      // 3rd retry: 10 min (600,000ms)
+      // 4th+ retry: 15 min (900,000ms)
+      let waitTimeMs = 60000;
+      if (attempts === 1) waitTimeMs = 5 * 60000;
+      else if (attempts === 2) waitTimeMs = 10 * 60000;
+      else if (attempts >= 3) waitTimeMs = 15 * 60000;
+
+      const timeElapsed = now - lastSent;
+
+      if (timeElapsed < waitTimeMs) {
+        const secondsLeft = Math.ceil((waitTimeMs - timeElapsed) / 1000);
+        const minutesLeft = Math.ceil(secondsLeft / 60);
+        
+        return res.status(429).json({ 
+          message: `Please wait ${minutesLeft} minute(s) before requesting another reset email.` 
+        });
+      }
+    }
+
     // Generate a random token
     const resetToken = crypto.randomBytes(20).toString('hex');
 
@@ -97,6 +133,11 @@ export const forgotPassword = async (req, res) => {
 
     // Set expire time (10 minutes)
     user.resetPasswordExpire = Date.now() + 10 * 60 * 1000;
+    
+    // 🚨 Save the tracking data
+    user.resetPasswordLastSent = now;
+    user.resetPasswordAttempts = attempts + 1;
+
     await user.save();
 
     // Point to /login?resetToken=... so the Login page can handle it
@@ -117,10 +158,13 @@ export const forgotPassword = async (req, res) => {
       });
       res.status(200).json({ message: 'Email sent successfully' });
     } catch (err) {
-      // If email fails, clear the token so they can try again
+      // If email fails, clear the token so they can try again without waiting
       user.resetPasswordToken = undefined;
       user.resetPasswordExpire = undefined;
+      user.resetPasswordLastSent = undefined; // Reset the cooldown
+      user.resetPasswordAttempts = Math.max(0, attempts - 1); // Undo the attempt count
       await user.save();
+      
       console.error('Email sending error:', err);
       return res.status(500).json({ message: 'Email could not be sent' });
     }
@@ -154,6 +198,11 @@ export const resetPassword = async (req, res) => {
     // Clear the reset token fields
     user.resetPasswordToken = undefined;
     user.resetPasswordExpire = undefined;
+    
+    // 🚨 Reset the backoff tracking on success
+    user.resetPasswordLastSent = null;
+    user.resetPasswordAttempts = 0;
+    
     await user.save();
 
     res.status(200).json({ message: 'Password reset successful' });

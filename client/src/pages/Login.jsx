@@ -10,6 +10,7 @@ export default function Login() {
   // State for password reset flow
   const [isForgotPassword, setIsForgotPassword] = useState(false);
   const [resetToken, setResetToken] = useState(null);
+  const [isSendingReset, setIsSendingReset] = useState(false); // 🚨 NEW: Prevent double clicks
 
   const [formData, setFormData] = useState({ name: '', email: '', phone: '', password: '' });
   const { login } = useContext(AuthContext);
@@ -52,6 +53,7 @@ export default function Login() {
 
     // 2. Handle Forgot Password Request
     if (isForgotPassword) {
+      setIsSendingReset(true); // Disable button
       const loadingToast = toast.loading('Sending reset link...');
       try {
         await axiosClient.post('/auth/forgot-password', { email: formData.email });
@@ -61,7 +63,10 @@ export default function Login() {
         setFormData({ ...formData, email: '' });
       } catch (err) {
         toast.dismiss(loadingToast);
+        // 🚨 This will automatically show the backoff message from the backend
         toast.error(err.response?.data?.message || 'Error sending email');
+      } finally {
+        setIsSendingReset(false); // Re-enable button
       }
       return;
     }
@@ -74,22 +79,18 @@ export default function Login() {
       
       const { data } = await axiosClient.post(endpoint, payload);
 
-      // 🚨 FIX: Since backend returns data directly, we extract properly
       const user = data.user || data; 
       const token = data.token;
       const userRole = (user.role || data.role || 'customer').toLowerCase();
 
-      // Update the AuthContext
       login(user, token);
       
       toast.dismiss(loadingToast);
       toast.success(isRegister ? 'Account created successfully!' : `Welcome back, ${user.name?.split(' ')[0] || 'there'}!`);
 
-      // 🚨 FIX: Redirect Logic
       const fromBooking = location.state?.from === '/booking';
       const serviceId = location.state?.serviceId;
 
-      // Use setTimeout to ensure AuthContext state is updated before routing
       setTimeout(() => {
         if (fromBooking) {
           navigate('/booking', { state: { selectedServiceId: serviceId } });
@@ -98,10 +99,8 @@ export default function Login() {
         } else if (userRole === 'staff') {
           navigate('/staff');
         } else if (isRegister) {
-          // 🚨 NEW: Newly registered users go to dashboard
           navigate('/dashboard');
         } else {
-          // Normal returning customers stay on homepage
           navigate(location.state?.from || '/');
         }
       }, 100);
@@ -215,9 +214,10 @@ export default function Login() {
 
             <button
               type="submit"
-              className="w-full bg-red-600 hover:bg-red-700 text-white py-3 md:py-4 rounded-xl font-bold tracking-wider transition-all duration-300 mt-2 md:mt-4 shadow-[0_0_20px_rgba(220,38,38,0.2)] hover:shadow-[0_0_30px_rgba(220,38,38,0.4)] hover:-translate-y-0.5 text-sm md:text-base"
+              disabled={isSendingReset}
+              className="w-full bg-red-600 hover:bg-red-700 text-white py-3 md:py-4 rounded-xl font-bold tracking-wider transition-all duration-300 mt-2 md:mt-4 shadow-[0_0_20px_rgba(220,38,38,0.2)] hover:shadow-[0_0_30px_rgba(220,38,38,0.4)] hover:-translate-y-0.5 text-sm md:text-base disabled:opacity-50 disabled:hover:-translate-y-0"
             >
-              {resetToken ? 'Reset Password' : isForgotPassword ? 'Send Reset Link' : isRegister ? 'Sign Up' : 'Sign In'}
+              {isSendingReset ? 'Sending...' : resetToken ? 'Reset Password' : isForgotPassword ? 'Send Reset Link' : isRegister ? 'Sign Up' : 'Sign In'}
             </button>
           </form>
 

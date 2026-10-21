@@ -45,6 +45,16 @@ const userSchema = new mongoose.Schema(
     resetPasswordExpire: { 
       type: Date,
       default: null 
+    },
+
+    // 🚨 NEW FIELDS FOR EXPONENTIAL BACKOFF
+    resetPasswordLastSent: { 
+      type: Date,
+      default: null 
+    },
+    resetPasswordAttempts: { 
+      type: Number,
+      default: 0 
     }
   },
   { 
