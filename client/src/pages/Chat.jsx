@@ -1,6 +1,7 @@
 import React, { useState, useContext, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
+import axiosClient from '../api/axiosClient'; // 🚨 Import axiosClient for real data
 import io from 'socket.io-client';
 import toast from 'react-hot-toast';
 
@@ -46,9 +47,35 @@ export default function Chat() {
     { id: 'status', label: '📊 Booking Status', question: 'How can I check my booking status?' }
   ];
 
-  const getAutoReply = (question) => {
+  // 🚨 NEW: Function to fetch real booking data
+  const fetchRealBookingStatus = async () => {
+    try {
+      const response = await axiosClient.get('/bookings/my-bookings');
+      const bookings = response.data;
+
+      if (!bookings || bookings.length === 0) {
+        return "You don't have any bookings yet. Click the 'New Booking' button on the dashboard to schedule a service!";
+      }
+
+      // Get the 3 most recent bookings
+      const recentBookings = bookings.slice(0, 3).map(b => {
+        const date = new Date(b.booking_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        return `• ${b.service_id?.name || 'Service'} (${date}) - Status: ${b.status}`;
+      }).join('\n');
+
+      return `Here are your recent bookings:\n\n${recentBookings}\n\nFor full details, please visit your Dashboard.`;
+    } catch (error) {
+      console.error("Failed to fetch bookings:", error);
+      return "I'm having trouble accessing your booking data right now. Please try again later or check your Dashboard.";
+    }
+  };
+
+  const getAutoReply = async (question) => {
     const q = question.toLowerCase();
 
+    if (q.includes('status') || q.includes('track') || q.includes('check')) {
+      return await fetchRealBookingStatus();
+    }
     if (q.includes('cancel') || q.includes('cancellation')) {
       return `❌ How to Cancel a Booking:\n\n1. Go to your Dashboard\n2. Navigate to "Upcoming" bookings\n3. Find the booking you want to cancel\n4. Click the "CANCEL" button\n5. Confirm your cancellation\n\n⚠️ Important: Cancellations must be made at least 2 hours before your appointment time.`;
     }
@@ -69,9 +96,6 @@ export default function Chat() {
     }
     if (q.includes('price') || q.includes('cost') || q.includes('pricing') || q.includes('fee')) {
       return `💰 Pricing Information:\n\nStarting Prices:\n- Oil Change: LKR 5,000\n- Full Service: LKR 15,000\n- Brake Service: LKR 8,000\n- AC Service: LKR 6,500\n\nFor exact pricing, visit the booking page.`;
-    }
-    if (q.includes('status') || q.includes('track') || q.includes('check')) {
-      return `📊 Checking Your Booking Status:\n\n1. Log in to your account\n2. Go to your Dashboard\n3. Check the status (Upcoming, In Progress, Completed, Cancelled)\n\nYou can download your service record once completed.`;
     }
     if (q.includes('thank') || q.includes('thanks')) {
       return `You're welcome! 😊 Is there anything else I can help you with?`;
@@ -261,19 +285,24 @@ export default function Chat() {
       hasSentFirstMessageRef.current = true;
       setTimeout(() => {
         socket.emit('send_message', {
-          senderId: 'bot', senderName: 'Royal Service Bot', senderRole: 'bot', threadId: userId,
+          senderId: 'bot', senderName: 'Royal Service Center', senderRole: 'bot', threadId: userId, // 🚨 Changed name here
           text: `Thank you for your message! I'll help you with that.\n\nYou can also use these quick commands:\n- Ask about booking appointments\n- Inquire about our services\n- Get our contact number\n- Check operating hours\n\nFor immediate assistance, call us at +94 74 365 8500 or email admin@royalservice.tech.`
         });
       }, 1000);
     }
   };
 
-  const handleQuickCommand = (command) => {
+  const handleQuickCommand = async (command) => {
     if (user?.role === 'admin' || !activeContact || !user) return;
     const userId = getUserId();
+    
+    // Send user's question
     socket.emit('send_message', { senderId: userId, senderName: user.name, senderRole: user.role, threadId: userId, text: command.question });
-    setTimeout(() => {
-      socket.emit('send_message', { senderId: 'bot', senderName: 'Royal Service Bot', senderRole: 'bot', threadId: userId, text: getAutoReply(command.question) });
+    
+    // Simulate bot typing delay
+    setTimeout(async () => {
+      const replyText = await getAutoReply(command.question); // 🚨 Await real data
+      socket.emit('send_message', { senderId: 'bot', senderName: 'Royal Service Center', senderRole: 'bot', threadId: userId, text: replyText }); // 🚨 Changed name here
     }, 800);
   };
 
@@ -438,7 +467,8 @@ export default function Chat() {
                   <span className="text-xs font-bold text-red-500">{activeContact.name?.charAt(0)?.toUpperCase() || 'B'}</span>
                 </div>
                 <div>
-                  <span className="font-bold text-white text-sm">{user?.role === 'admin' ? activeContact.name : 'Royal Service Bot'}</span>
+                  {/* 🚨 Changed Name Here */}
+                  <span className="font-bold text-white text-sm">{user?.role === 'admin' ? activeContact.name : 'Royal Service Center'}</span>
                   <p className="text-[10px] text-zinc-500">{isTyping ? `${typingUser} is typing...` : 'online'}</p>
                 </div>
               </div>
@@ -471,7 +501,7 @@ export default function Chat() {
                   <div key={msg._id || `${msg.createdAt}-${index}`} className={`flex flex-col ${isMyMessage ? 'items-end' : 'items-start'}`}>
                     <div className="flex items-center gap-2 mb-1">
                       <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider">
-                        {isMyMessage ? 'You' : isBot ? '🤖 Bot' : msg.senderName}
+                        {isMyMessage ? 'You' : isBot ? '🏢 Royal Service Center' : msg.senderName}
                       </span>
                       {msg.createdAt && <span className="text-[9px] text-zinc-600">{formatTime(msg.createdAt)}</span>}
                     </div>
