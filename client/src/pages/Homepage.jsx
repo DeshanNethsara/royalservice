@@ -337,7 +337,7 @@ export default function Homepage() {
               <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-red-600 group-hover:w-full transition-all duration-300"></span>
             </button>
             
-            {/* 🚨 NEW: Show for all logged-in users */}
+            {/* Show for all logged-in users in Nav */}
             {user && (
               <button 
                 onClick={handleDashboardRedirect} 
@@ -374,9 +374,9 @@ export default function Homepage() {
                       </div>
                       <div className="py-2">
                         <button onClick={() => { setIsDropdownOpen(false); navigate('/profile'); }} className="block w-full text-left px-4 py-2.5 text-sm font-medium text-zinc-700 hover:text-red-600 hover:bg-zinc-50">Edit Profile</button>
-                        <button onClick={() => { setIsDropdownOpen(false); handleDashboardRedirect(); }} className="block w-full text-left px-4 py-2.5 text-sm font-medium text-zinc-700 hover:text-red-600 hover:bg-zinc-50">
-                          {user.role === 'customer' ? 'My Bookings' : 'Dashboard'}
-                        </button>
+                        
+                        {/* 🚨 REMOVED DUPLICATE "MY BOOKINGS" / "DASHBOARD" FROM HERE */}
+                        
                         <div className="border-t border-zinc-100 my-1"></div>
                         <button onClick={handleLogout} className="block w-full text-left px-4 py-2.5 text-sm font-medium text-red-600 hover:bg-red-50">Logout</button>
                       </div>
@@ -425,7 +425,6 @@ export default function Homepage() {
 
               {user ? (
                 <>
-                  {/* 🚨 NEW: Show in mobile menu too */}
                   <button onClick={() => { setIsMobileMenuOpen(false); handleDashboardRedirect(); }} className="block w-full text-left px-4 py-3 text-zinc-700 hover:text-red-600 hover:bg-zinc-50 rounded-lg font-medium">
                     {user.role === 'customer' ? 'My Bookings' : 'Dashboard'}
                   </button>
