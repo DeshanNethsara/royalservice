@@ -171,7 +171,6 @@ export default function Chat() {
 
     const handleContactsList = (list) => setContacts(list);
     
-    // 🚨 Update contact list AND active chat when a user comes online
     const handleUserOnline = (newUser) => {
       setContacts(prev => {
         const idx = prev.findIndex(c => c._id === newUser._id);
@@ -190,7 +189,6 @@ export default function Chat() {
       );
     };
 
-    // 🚨 Update contact list AND active chat when a user goes offline
     const handleUserOffline = ({ userId }) => {
       setContacts(prev => prev.map(c => String(c._id) === String(userId) ? { ...c, isOnline: false } : c));
       
@@ -424,9 +422,11 @@ export default function Chat() {
             </svg>
           </button>
           <div className="flex flex-col">
-            <h2 className="text-base md:text-lg font-black tracking-widest uppercase text-white">Direct Comm-Link</h2>
+            {/* 🚨 RENAMED HEADER HERE */}
+            <h2 className="text-base md:text-lg font-black tracking-widest uppercase text-white">Support Center</h2>
             <span className="text-[9px] md:text-[10px] text-emerald-400 font-bold uppercase tracking-widest flex items-center gap-1">
-              <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></span> Live Sync Active
+              <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></span> 
+              {user?.role === 'admin' ? 'Live Chat' : "We're online"}
             </span>
           </div>
         </div>
@@ -511,7 +511,6 @@ export default function Chat() {
                 </div>
                 <div>
                   <span className="font-bold text-white text-sm">{user?.role === 'admin' ? activeContact.name : 'Royal Service Center'}</span>
-                  {/* 🚨 FIX: Accurate online/offline status */}
                   <p className="text-[10px] text-zinc-500">
                     {isTyping 
                       ? `${typingUser} is typing...` 
