@@ -4,6 +4,12 @@ import cors from 'cors';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
 
+// 🚨 NEW: Security Middleware Imports
+import helmet from 'helmet';
+import rateLimit from 'express-rate-limit';
+// 🚨 UPDATED: Using the Express 5 compatible fork
+import mongoSanitize from '@exortek/express-mongo-sanitize';
+
 import connectDB from './configs/db.js';
 
 import Message from './models/Message.js';
@@ -15,12 +21,15 @@ import serviceRoutes from './routes/serviceRoutes.js';
 import bookingRoutes from './routes/bookingRoutes.js';
 
 const app = express();
+
+// 🚨 CRITICAL FIX: Trust Render's proxy so rate limiting works per-user, not globally
+app.set('trust proxy', 1);
+
 const httpServer = createServer(app);
 
 // =========================
 // CORS CONFIGURATION
 // =========================
-// Allow localhost for dev, and the live domain for production
 const allowedOrigins = [
   'http://localhost:5173',
   'https://royalservice.tech',
@@ -31,7 +40,6 @@ const allowedOrigins = [
 // =========================
 // SOCKET.IO
 // =========================
-
 const io = new Server(httpServer, {
   cors: {
     origin: allowedOrigins,
@@ -43,13 +51,11 @@ const io = new Server(httpServer, {
 // =========================
 // DATABASE
 // =========================
-
 await connectDB();
 
 // =========================
 // EXPRESS CORS
 // =========================
-
 const corsOptions = {
   origin: allowedOrigins,
   credentials: true,
@@ -61,7 +67,26 @@ const corsOptions = {
 app.use(cors(corsOptions));
 
 // =========================
-// MIDDLEWARE
+// 🚨 SECURITY MIDDLEWARE
+// =========================
+
+// 1. Helmet: Sets HTTP security headers (protects against XSS, clickjacking, etc.)
+app.use(helmet());
+
+// 2. Data Sanitization: Prevents NoSQL injection attacks
+app.use(mongoSanitize());
+
+// 3. Rate Limiting: Prevents brute-force attacks on login/register routes
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 20, // Limit each IP to 20 requests per windowMs
+  message: 'Too many login attempts from this IP, please try again after 15 minutes',
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// =========================
+// STANDARD MIDDLEWARE
 // =========================
 
 app.use(
@@ -81,7 +106,8 @@ app.use(
 // API ROUTES
 // =========================
 
-app.use('/api/auth', authRoutes);
+// Apply the rate limiter to authentication routes
+app.use('/api/auth', authLimiter, authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/services', serviceRoutes);
 app.use('/api/bookings', bookingRoutes);
@@ -265,7 +291,6 @@ io.on('connection', (socket) => {
 // =========================
 // START SERVER
 // =========================
-
 const PORT = process.env.PORT || 5000;
 
 httpServer.listen(PORT, () => {

@@ -5,10 +5,11 @@ import Report from '../models/Report.js';
 import PDFDocument from 'pdfkit';
 import multer from 'multer';
 import { v2 as cloudinary } from 'cloudinary';
-import { CloudinaryStorage } from 'multer-storage-cloudinary';
+// 🚨 UPDATED: Using the v2 compatible storage engine
+import { CloudinaryStorage } from 'multer-storage-cloudinary-v2';
 import sendEmail from '../utils/sendEmail.js';
 
-// 🚨 NEW: Imports for finding the logo file path
+// Imports for finding the logo file path
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -26,9 +27,12 @@ cloudinary.config({
 
 const storage = new CloudinaryStorage({
   cloudinary: cloudinary,
-  params: {
-    folder: 'royal_service_slips',
-    allowed_formats: ['jpg', 'png', 'jpeg', 'pdf'],
+  // 🚨 UPDATED: v2 requires params to be a function that returns the config
+  params: async (req, file) => {
+    return {
+      folder: 'royal_service_slips',
+      allowed_formats: ['jpg', 'png', 'jpeg', 'pdf'],
+    };
   },
 });
 
@@ -104,8 +108,7 @@ const buildServiceRecordPDF = (booking, report, payment) => {
     doc.rect(0, 0, PAGE_W, 110).fill(BRAND_DARK);
     doc.rect(0, 110, PAGE_W, 4).fill(BRAND_RED);
     
-    // 🚨 REPLACED CIRCLE 'R' WITH ACTUAL LOGO IMAGE
-    // Assumes logo.png is saved in the same folder as this controller file
+    // Logo Image
     const logoPath = path.join(__dirname, 'logo.png');
     doc.image(logoPath, M, 30, { width: 50, height: 50 });
     
@@ -274,7 +277,6 @@ export const createBooking = async (req, res) => {
       if (vehicleData._id) {
         vehicle = await Vehicle.findById(vehicleData._id);
         if (!vehicle) return res.status(404).json({ message: 'Vehicle not found' });
-        // Update mileage on existing vehicle so PDF reflects current value
         if (vehicleData.mileage !== undefined && vehicleData.mileage !== null && vehicleData.mileage !== '') {
           vehicle.mileage = Number(vehicleData.mileage);
           await vehicle.save();
@@ -296,7 +298,6 @@ export const createBooking = async (req, res) => {
             vehicle_type: vehicleData.vehicle_type || 'Car'
           });
         } else {
-          // Existing vehicle — update mileage with the latest entered value
           if (vehicleData.mileage !== undefined && vehicleData.mileage !== null && vehicleData.mileage !== '') {
             vehicle.mileage = Number(vehicleData.mileage);
             await vehicle.save();
