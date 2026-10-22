@@ -26,7 +26,7 @@ export default function AdminPanel() {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
 
-  // 🚨 NEW: Pagination State
+  // Pagination State
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 20;
 
@@ -38,6 +38,11 @@ export default function AdminPanel() {
   // State for the Slip Modal
   const [slipModalOpen, setSlipModalOpen] = useState(false);
   const [selectedSlipBooking, setSelectedSlipBooking] = useState(null);
+
+  // 🚨 STATE FOR MONTHLY REPORT
+  const [reportYear, setReportYear] = useState(new Date().getFullYear());
+  const [reportMonth, setReportMonth] = useState(new Date().getMonth()); // 0-11
+  const [reportData, setReportData] = useState(null);
 
   useEffect(() => {
     if (!user || user.role !== 'admin') {
@@ -268,6 +273,44 @@ export default function AdminPanel() {
     }
   };
 
+  // 🚨 GENERATE MONTHLY REPORT
+  const handleGenerateReport = () => {
+    const filtered = bookings.filter((b) => {
+      if (!b.booking_date) return false;
+      const bDate = new Date(b.booking_date);
+      return bDate.getFullYear() === reportYear && bDate.getMonth() === reportMonth;
+    });
+
+    const totalRevenue = filtered.reduce((sum, b) => {
+      // Only count revenue from completed jobs
+      if (b.status === 'Completed') return sum + (b.total_price || 0);
+      return sum;
+    }, 0);
+
+    const completedCount = filtered.filter((b) => b.status === 'Completed').length;
+    const cancelledCount = filtered.filter((b) => ['Cancelled', 'Rejected'].includes(b.status)).length;
+    const pendingCount = filtered.filter((b) => ['Pending', 'Confirmed', 'In Progress'].includes(b.status)).length;
+
+    // Group by service for a mini breakdown
+    const serviceBreakdown = {};
+    filtered.forEach((b) => {
+      const sName = b.service_id?.name || 'Unknown Service';
+      if (!serviceBreakdown[sName]) serviceBreakdown[sName] = { count: 0, revenue: 0 };
+      serviceBreakdown[sName].count += 1;
+      if (b.status === 'Completed') serviceBreakdown[sName].revenue += (b.total_price || 0);
+    });
+
+    setReportData({
+      bookings: filtered,
+      totalRevenue,
+      totalBookings: filtered.length,
+      completedCount,
+      cancelledCount,
+      pendingCount,
+      serviceBreakdown,
+    });
+  };
+
   // Filtered data
   const filteredBookings = useMemo(() => {
     return bookings.filter((b) => {
@@ -285,13 +328,12 @@ export default function AdminPanel() {
     });
   }, [bookings, searchTerm, statusFilter]);
 
-  // 🚨 PAGINATION MATH
+  // PAGINATION MATH
   const indexOfLastItem = currentPage * itemsPerPage;
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
   const currentItems = filteredBookings.slice(indexOfFirstItem, indexOfLastItem);
   const totalPages = Math.ceil(filteredBookings.length / itemsPerPage);
 
-  // 🚨 RESET PAGE ON FILTER CHANGE
   useEffect(() => {
     setCurrentPage(1);
   }, [searchTerm, statusFilter, activeTab]);
@@ -319,7 +361,7 @@ export default function AdminPanel() {
       case 'Pending':
         return 'bg-amber-500/10 text-amber-500 border-amber-500/30';
       case 'Confirmed':
-        return 'bg-cyan-500/10 text-cyan-400 border-cyan-500/30'; // 🚨 Changed to Cyan
+        return 'bg-cyan-500/10 text-cyan-400 border-cyan-500/30';
       case 'In Progress':
         return 'bg-blue-500/10 text-blue-400 border-blue-500/20';
       case 'Completed':
@@ -343,6 +385,11 @@ export default function AdminPanel() {
       <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-red-600"></div>
     </div>
   );
+
+  const months = [
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December'
+  ];
 
   return (
     <div className="min-h-screen bg-zinc-950 font-sans text-zinc-50 flex flex-col md:flex-row relative">
@@ -435,6 +482,13 @@ export default function AdminPanel() {
             >
               👥 Users
             </button>
+            {/* 🚨 NEW: Reports Tab */}
+            <button
+              onClick={() => { setActiveTab('reports'); setIsSidebarOpen(false); setSearchTerm(''); }}
+              className={`w-full text-left px-4 py-3 rounded-xl font-bold text-sm transition-all ${activeTab === 'reports' ? 'bg-red-600 text-white shadow-lg shadow-red-600/25' : 'text-zinc-400 hover:bg-zinc-800 hover:text-white'}`}
+            >
+              📊 Reports
+            </button>
           </nav>
         </div>
 
@@ -451,36 +505,38 @@ export default function AdminPanel() {
       {/* Main Content */}
       <div className="flex-1 p-4 md:p-6 overflow-y-auto h-[calc(100vh-73px)] md:h-screen">
         {/* Search Bar */}
-        <div className="mb-6 flex flex-col md:flex-row gap-4">
-          <div className="flex-1 relative">
-            <input
-              type="text"
-              placeholder={activeTab === 'bookings' ? 'Search by ref, name, phone, or service...' : `Search ${activeTab}...`}
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full bg-zinc-900 border border-zinc-800 text-white p-3 pl-10 rounded-xl focus:border-red-600 focus:ring-1 focus:ring-red-600 focus:outline-none placeholder:text-zinc-600"
-            />
-            <svg className="w-5 h-5 text-zinc-500 absolute left-3 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-            </svg>
-          </div>
+        {activeTab !== 'reports' && (
+          <div className="mb-6 flex flex-col md:flex-row gap-4">
+            <div className="flex-1 relative">
+              <input
+                type="text"
+                placeholder={activeTab === 'bookings' ? 'Search by ref, name, phone, or service...' : `Search ${activeTab}...`}
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full bg-zinc-900 border border-zinc-800 text-white p-3 pl-10 rounded-xl focus:border-red-600 focus:ring-1 focus:ring-red-600 focus:outline-none placeholder:text-zinc-600"
+              />
+              <svg className="w-5 h-5 text-zinc-500 absolute left-3 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+            </div>
 
-          {activeTab === 'bookings' && (
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="bg-zinc-900 border border-zinc-800 text-white p-3 rounded-xl focus:border-red-600 focus:outline-none"
-            >
-              <option value="all">All Statuses</option>
-              <option value="Pending">Pending</option>
-              <option value="Confirmed">Confirmed</option>
-              <option value="In Progress">In Progress</option>
-              <option value="Completed">Completed</option>
-              <option value="Cancelled">Cancelled</option>
-              <option value="Rejected">Rejected</option>
-            </select>
-          )}
-        </div>
+            {activeTab === 'bookings' && (
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="bg-zinc-900 border border-zinc-800 text-white p-3 rounded-xl focus:border-red-600 focus:outline-none"
+              >
+                <option value="all">All Statuses</option>
+                <option value="Pending">Pending</option>
+                <option value="Confirmed">Confirmed</option>
+                <option value="In Progress">In Progress</option>
+                <option value="Completed">Completed</option>
+                <option value="Cancelled">Cancelled</option>
+                <option value="Rejected">Rejected</option>
+              </select>
+            )}
+          </div>
+        )}
 
         {/* BOOKINGS TAB */}
         {activeTab === 'bookings' && (
@@ -590,7 +646,6 @@ export default function AdminPanel() {
                   </div>
                 </div>
 
-                {/* 🚨 PAGINATION CONTROLS FOR BOOKINGS */}
                 {totalPages > 1 && (
                   <div className="flex items-center justify-between mt-4 bg-zinc-900 border border-zinc-800 rounded-xl p-3">
                     <span className="text-sm text-zinc-400">
@@ -761,6 +816,145 @@ export default function AdminPanel() {
                     </tbody>
                   </table>
                 </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* 🚨 REPORTS TAB */}
+        {activeTab === 'reports' && (
+          <div>
+            <h3 className="text-2xl font-black text-white mb-2 uppercase tracking-tight">Monthly Report</h3>
+            <p className="text-zinc-400 mb-6">Select a month to generate a summary of revenue and bookings.</p>
+
+            {/* Filter Bar */}
+            <div className="bg-zinc-900 p-4 rounded-xl border border-zinc-800 mb-6 flex flex-wrap gap-4 items-end">
+              <div>
+                <label className="block text-xs text-zinc-500 font-bold uppercase mb-1">Year</label>
+                <select
+                  value={reportYear}
+                  onChange={(e) => setReportYear(Number(e.target.value))}
+                  className="bg-zinc-950 border border-zinc-800 text-white p-2.5 rounded-lg focus:border-red-600 focus:outline-none"
+                >
+                  {[...Array(5)].map((_, i) => {
+                    const y = new Date().getFullYear() - i;
+                    return <option key={y} value={y}>{y}</option>;
+                  })}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs text-zinc-500 font-bold uppercase mb-1">Month</label>
+                <select
+                  value={reportMonth}
+                  onChange={(e) => setReportMonth(Number(e.target.value))}
+                  className="bg-zinc-950 border border-zinc-800 text-white p-2.5 rounded-lg focus:border-red-600 focus:outline-none"
+                >
+                  {months.map((m, i) => (
+                    <option key={i} value={i}>{m}</option>
+                  ))}
+                </select>
+              </div>
+              <button
+                onClick={handleGenerateReport}
+                className="bg-red-600 hover:bg-red-700 text-white font-bold py-2.5 px-6 rounded-lg transition-colors shadow-lg shadow-red-600/20"
+              >
+                Generate Report
+              </button>
+            </div>
+
+            {/* Report Results */}
+            {reportData && (
+              <div className="animate-[fadeIn_0.4s_ease-out]">
+                
+                {/* Summary Cards */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+                  <div className="bg-zinc-900 border border-zinc-800 p-5 rounded-xl">
+                    <p className="text-zinc-500 text-xs font-bold uppercase mb-1">Total Revenue (Completed)</p>
+                    <p className="text-2xl font-black text-emerald-400">LKR {reportData.totalRevenue.toLocaleString()}</p>
+                  </div>
+                  <div className="bg-zinc-900 border border-zinc-800 p-5 rounded-xl">
+                    <p className="text-zinc-500 text-xs font-bold uppercase mb-1">Total Bookings</p>
+                    <p className="text-2xl font-black text-white">{reportData.totalBookings}</p>
+                  </div>
+                  <div className="bg-zinc-900 border border-zinc-800 p-5 rounded-xl">
+                    <p className="text-zinc-500 text-xs font-bold uppercase mb-1">Completed Jobs</p>
+                    <p className="text-2xl font-black text-emerald-400">{reportData.completedCount}</p>
+                  </div>
+                  <div className="bg-zinc-900 border border-zinc-800 p-5 rounded-xl">
+                    <p className="text-zinc-500 text-xs font-bold uppercase mb-1">Cancelled / Rejected</p>
+                    <p className="text-2xl font-black text-red-500">{reportData.cancelledCount}</p>
+                  </div>
+                </div>
+
+                {/* Service Breakdown */}
+                <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6 mb-8">
+                  <h4 className="text-sm font-bold text-white uppercase tracking-wider mb-4">Service Breakdown</h4>
+                  <div className="space-y-3">
+                    {Object.entries(reportData.serviceBreakdown).map(([name, data]) => (
+                      <div key={name} className="flex justify-between items-center border-b border-zinc-800/50 pb-2">
+                        <span className="text-zinc-300 text-sm font-medium">{name}</span>
+                        <div className="text-right">
+                          <span className="text-white font-bold text-sm">{data.count} bookings</span>
+                          <span className="text-zinc-500 text-xs ml-2">(LKR {data.revenue.toLocaleString()})</span>
+                        </div>
+                      </div>
+                    ))}
+                    {Object.keys(reportData.serviceBreakdown).length === 0 && (
+                      <p className="text-zinc-500 text-sm italic">No bookings for this month.</p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Detailed Table */}
+                <h4 className="text-sm font-bold text-white uppercase tracking-wider mb-3">Detailed Bookings List</h4>
+                <div className="bg-zinc-900 rounded-2xl border border-zinc-800 overflow-hidden">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left whitespace-nowrap">
+                      <thead className="bg-zinc-950/60 text-zinc-400 text-xs font-bold uppercase tracking-wider">
+                        <tr>
+                          <th className="p-4">Date</th>
+                          <th className="p-4">Ref</th>
+                          <th className="p-4">Customer</th>
+                          <th className="p-4">Service</th>
+                          <th className="p-4">Status</th>
+                          <th className="p-4 text-right">Amount</th>
+                        </tr>
+                      </thead>
+                      <tbody className="text-sm">
+                        {reportData.bookings.length === 0 ? (
+                          <tr>
+                            <td colSpan="6" className="p-8 text-center text-zinc-500">No bookings for this month.</td>
+                          </tr>
+                        ) : (
+                          reportData.bookings.map((b) => (
+                            <tr key={b._id} className="hover:bg-zinc-800/50 transition-colors">
+                              <td className="p-4 border-b border-zinc-800 text-zinc-300">{b.booking_date}</td>
+                              <td className="p-4 border-b border-zinc-800 text-zinc-400 text-xs">{b.booking_ref}</td>
+                              <td className="p-4 border-b border-zinc-800 text-zinc-300">{b.user_id?.name || b.userData?.name || 'N/A'}</td>
+                              <td className="p-4 border-b border-zinc-800 text-zinc-300">{b.service_id?.name}</td>
+                              <td className="p-4 border-b border-zinc-800">
+                                <span className={`text-[10px] px-2 py-1 rounded border font-bold uppercase tracking-wider ${getStatusStyle(b.status)}`}>
+                                  {b.status}
+                                </span>
+                              </td>
+                              <td className="p-4 border-b border-zinc-800 text-right font-bold text-zinc-300">
+                                {b.status === 'Completed' ? `LKR ${b.total_price?.toLocaleString()}` : '-'}
+                              </td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+              </div>
+            )}
+
+            {!reportData && (
+              <div className="flex flex-col items-center justify-center py-20 text-zinc-500 border border-dashed border-zinc-800 rounded-2xl bg-zinc-900/30">
+                <svg className="w-16 h-16 mb-4 opacity-30" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                <p>Select a month and click "Generate Report" to see data.</p>
               </div>
             )}
           </div>
