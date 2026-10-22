@@ -39,7 +39,7 @@ export default function AdminPanel() {
   const [slipModalOpen, setSlipModalOpen] = useState(false);
   const [selectedSlipBooking, setSelectedSlipBooking] = useState(null);
 
-  // 🚨 STATE FOR MONTHLY REPORT
+  // State for MONTHLY REPORT
   const [reportYear, setReportYear] = useState(new Date().getFullYear());
   const [reportMonth, setReportMonth] = useState(new Date().getMonth()); // 0-11
   const [reportData, setReportData] = useState(null);
@@ -273,7 +273,7 @@ export default function AdminPanel() {
     }
   };
 
-  // 🚨 GENERATE MONTHLY REPORT
+  // GENERATE MONTHLY REPORT (Calculations for UI)
   const handleGenerateReport = () => {
     const filtered = bookings.filter((b) => {
       if (!b.booking_date) return false;
@@ -282,7 +282,6 @@ export default function AdminPanel() {
     });
 
     const totalRevenue = filtered.reduce((sum, b) => {
-      // Only count revenue from completed jobs
       if (b.status === 'Completed') return sum + (b.total_price || 0);
       return sum;
     }, 0);
@@ -291,7 +290,6 @@ export default function AdminPanel() {
     const cancelledCount = filtered.filter((b) => ['Cancelled', 'Rejected'].includes(b.status)).length;
     const pendingCount = filtered.filter((b) => ['Pending', 'Confirmed', 'In Progress'].includes(b.status)).length;
 
-    // Group by service for a mini breakdown
     const serviceBreakdown = {};
     filtered.forEach((b) => {
       const sName = b.service_id?.name || 'Unknown Service';
@@ -309,6 +307,35 @@ export default function AdminPanel() {
       pendingCount,
       serviceBreakdown,
     });
+  };
+
+  // 🚨 DOWNLOAD PDF REPORT (Calls the Backend)
+  const handleDownloadPDFReport = async () => {
+    if (!reportData) return;
+    const loadingToast = toast.loading('Generating PDF...');
+    
+    try {
+      const response = await axiosClient.get(
+        `/bookings/report/monthly?year=${reportYear}&month=${reportMonth}`,
+        { responseType: 'blob' }
+      );
+
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `Monthly_Report_${months[reportMonth]}_${reportYear}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+      
+      toast.dismiss(loadingToast);
+      toast.success('PDF Report downloaded!');
+    } catch (error) {
+      console.error('Error downloading PDF:', error);
+      toast.dismiss(loadingToast);
+      toast.error('Failed to generate PDF report');
+    }
   };
 
   // Filtered data
@@ -482,7 +509,6 @@ export default function AdminPanel() {
             >
               👥 Users
             </button>
-            {/* 🚨 NEW: Reports Tab */}
             <button
               onClick={() => { setActiveTab('reports'); setIsSidebarOpen(false); setSearchTerm(''); }}
               className={`w-full text-left px-4 py-3 rounded-xl font-bold text-sm transition-all ${activeTab === 'reports' ? 'bg-red-600 text-white shadow-lg shadow-red-600/25' : 'text-zinc-400 hover:bg-zinc-800 hover:text-white'}`}
@@ -821,7 +847,7 @@ export default function AdminPanel() {
           </div>
         )}
 
-        {/* 🚨 REPORTS TAB */}
+        {/* REPORTS TAB */}
         {activeTab === 'reports' && (
           <div>
             <h3 className="text-2xl font-black text-white mb-2 uppercase tracking-tight">Monthly Report</h3>
@@ -854,12 +880,27 @@ export default function AdminPanel() {
                   ))}
                 </select>
               </div>
-              <button
-                onClick={handleGenerateReport}
-                className="bg-red-600 hover:bg-red-700 text-white font-bold py-2.5 px-6 rounded-lg transition-colors shadow-lg shadow-red-600/20"
-              >
-                Generate Report
-              </button>
+              
+              <div className="flex gap-3">
+                <button
+                  onClick={handleGenerateReport}
+                  className="bg-red-600 hover:bg-red-700 text-white font-bold py-2.5 px-6 rounded-lg transition-colors shadow-lg shadow-red-600/20"
+                >
+                  Generate Report
+                </button>
+                
+                {reportData && (
+                  <button
+                    onClick={handleDownloadPDFReport}
+                    className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 px-5 rounded-lg transition-colors shadow-lg shadow-emerald-600/20"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                    </svg>
+                    Download PDF
+                  </button>
+                )}
+              </div>
             </div>
 
             {/* Report Results */}

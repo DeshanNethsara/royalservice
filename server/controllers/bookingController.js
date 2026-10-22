@@ -5,7 +5,6 @@ import Report from '../models/Report.js';
 import PDFDocument from 'pdfkit';
 import multer from 'multer';
 import { v2 as cloudinary } from 'cloudinary';
-// 🚨 UPDATED: Using the v2 compatible storage engine
 import { CloudinaryStorage } from 'multer-storage-cloudinary-v2';
 import sendEmail from '../utils/sendEmail.js';
 
@@ -27,7 +26,6 @@ cloudinary.config({
 
 const storage = new CloudinaryStorage({
   cloudinary: cloudinary,
-  // 🚨 UPDATED: v2 requires params to be a function that returns the config
   params: async (req, file) => {
     return {
       folder: 'royal_service_slips',
@@ -62,7 +60,7 @@ const isTimeSlotInPast = (date, time) => {
   return slotDateTime < now;
 };
 
-// Generates the PDF and returns a Buffer
+// Generates the Service Record PDF
 const buildServiceRecordPDF = (booking, report, payment) => {
   return new Promise((resolve, reject) => {
     const doc = new PDFDocument({ size: 'A4', margin: 0 });
@@ -99,7 +97,6 @@ const buildServiceRecordPDF = (booking, report, payment) => {
       return `LKR ${Number(amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
     };
 
-    // Calculate Next Service Mileage
     const currentMileage = Number(vehicle?.mileage) || 0;
     const nextServiceMileage = currentMileage + 5000;
     const formattedCurrentMileage = currentMileage.toLocaleString('en-US');
@@ -108,7 +105,6 @@ const buildServiceRecordPDF = (booking, report, payment) => {
     doc.rect(0, 0, PAGE_W, 110).fill(BRAND_DARK);
     doc.rect(0, 110, PAGE_W, 4).fill(BRAND_RED);
     
-    // Logo Image
     const logoPath = path.join(__dirname, 'logo.png');
     doc.image(logoPath, M, 30, { width: 50, height: 50 });
     
@@ -141,8 +137,6 @@ const buildServiceRecordPDF = (booking, report, payment) => {
     };
 
     drawInfoCard(M, y, 'CUSTOMER', [customer?.name || 'N/A', customer?.email || 'N/A', customer?.phone || 'N/A']);
-    
-    // Vehicle Card
     drawInfoCard(M + cardW + 20, y, 'VEHICLE', [
       vehicle?.reg_number?.toUpperCase() || 'N/A',
       `${vehicle?.make || 'N/A'} ${vehicle?.model || ''}`.trim(),
@@ -180,36 +174,28 @@ const buildServiceRecordPDF = (booking, report, payment) => {
     y += 30;
     doc.fillColor(GRAY_TEXT).fontSize(10).font('Helvetica').text(report.notes || 'Routine service completed successfully.', M, y, { width: PAGE_W - M * 2, align: 'justify', lineGap: 3 });
     
-    // Grab dynamic Y position after notes
     y = doc.y + 20;
 
-    // NEXT SERVICE RECOMMENDATION BANNER
     const recH = 70;
     doc.rect(M, y, PAGE_W - M * 2, recH).fill('#fef2f2');
     doc.rect(M, y, 4, recH).fill(BRAND_RED);
     doc.fillColor(BRAND_RED).fontSize(9).font('Helvetica-Bold').text('NEXT SERVICE RECOMMENDATION', M + 15, y + 12, { characterSpacing: 1.2 });
     doc.fillColor(BRAND_DARK).fontSize(14).font('Helvetica-Bold').text(`Due at ${formattedNextMileage} km`, M + 15, y + 28);
     doc.fillColor(GRAY_TEXT).fontSize(8.5).font('Helvetica').text(`Schedule your next service after ${formattedNextMileage} km (current: ${formattedCurrentMileage} km). Timely maintenance ensures optimal performance and longevity of your vehicle.`, M + 15, y + 48, { width: PAGE_W - M * 2 - 30, lineGap: 2 });
-    
-    // Update Y dynamically based on the bottom of the banner
     y = y + recH + 20;
 
-    // CERTIFICATION BOX
     const certH = 70;
     doc.rect(M, y, PAGE_W - M * 2, certH).fill(LIGHT_GRAY);
     doc.rect(M, y, 4, certH).fill(BRAND_RED);
     doc.fillColor(BRAND_DARK).fontSize(9).font('Helvetica-Bold').text('CERTIFICATION', M + 15, y + 12, { characterSpacing: 1.2 });
     doc.fillColor(GRAY_TEXT).fontSize(8.5).font('Helvetica').text('This document certifies that the above-mentioned service was performed on the stated vehicle by Royal Service Center.', M + 15, y + 28, { width: PAGE_W - M * 2 - 30, lineGap: 2 });
 
-    // FOOTER
     const footerY = PAGE_H - 70;
-    
-    // Only draw footer if it doesn't overlap the content
     if (y + certH < footerY - 10) {
       doc.moveTo(M, footerY).lineTo(PAGE_W - M, footerY).strokeColor(BORDER_GRAY).lineWidth(1).stroke();
       doc.fillColor(BRAND_DARK).fontSize(9).font('Helvetica-Bold').text('ROYAL SERVICE CENTER', M, footerY + 12);
-      doc.fillColor(GRAY_TEXT).fontSize(8).font('Helvetica').text('123 Service Road, Colombo 05, Sri Lanka', M, footerY + 26);
-      doc.fillColor(GRAY_TEXT).fontSize(8).font('Helvetica').text('+94 11 760 0800  •  support@royalservice.lk', M, footerY + 38);
+      doc.fillColor(GRAY_TEXT).fontSize(8).font('Helvetica').text('13/5 Service Road, Colombo 05, Sri Lanka', M, footerY + 26);
+      doc.fillColor(GRAY_TEXT).fontSize(8).font('Helvetica').text('+94 74 365 8500  •  admin@royalservice.tech', M, footerY + 38);
       doc.fillColor(GRAY_TEXT).fontSize(7.5).font('Helvetica').text(`Generated: ${new Date().toLocaleString()}`, PAGE_W - M - 200, footerY + 26, { width: 200, align: 'right' });
       doc.fillColor(BRAND_RED).fontSize(7.5).font('Helvetica-Bold').text('OFFICIAL DOCUMENT', PAGE_W - M - 200, footerY + 38, { width: 200, align: 'right', characterSpacing: 1 });
     }
@@ -518,5 +504,134 @@ export const generateServiceRecordPDF = async (req, res) => {
   } catch (error) {
     console.error('Error generating PDF:', error);
     if (!res.headersSent) res.status(500).json({ message: error.message || 'Failed to generate PDF' });
+  }
+};
+
+// ==========================================================
+// 🚨 NEW: GENERATE MONTHLY REPORT PDF
+// ==========================================================
+export const generateMonthlyReportPDF = async (req, res) => {
+  try {
+    const { year, month } = req.query;
+    if (!year || !month) return res.status(400).json({ message: 'Year and month are required' });
+
+    const startDate = new Date(year, month, 1).toISOString().split('T')[0];
+    const endDate = new Date(year, month + 1, 0).toISOString().split('T')[0];
+
+    const bookings = await Booking.find({
+      booking_date: { $gte: startDate, $lte: endDate }
+    })
+      .populate('user_id', 'name email')
+      .populate('service_id', 'name')
+      .sort({ booking_date: 1 });
+
+    const doc = new PDFDocument({ size: 'A4', margin: 40 });
+    const chunks = [];
+    doc.on('data', (chunk) => chunks.push(chunk));
+    doc.on('end', () => {
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename=Monthly_Report_${year}_${Number(month) + 1}.pdf`);
+      res.setHeader('Content-Length', Buffer.concat(chunks).length);
+      res.end(Buffer.concat(chunks));
+    });
+
+    const PAGE_W = 595.28;
+    const PAGE_H = 841.89;
+    const M = 40;
+    const BRAND_RED = '#dc2626';
+    const BRAND_DARK = '#18181b';
+    const GRAY_TEXT = '#52525b';
+    const LIGHT_GRAY = '#f4f4f5';
+    const BORDER_GRAY = '#e4e4e7';
+
+    const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+    const monthName = monthNames[Number(month)];
+
+    // Header
+    doc.rect(0, 0, PAGE_W, 110).fill(BRAND_DARK);
+    doc.rect(0, 110, PAGE_W, 4).fill(BRAND_RED);
+    
+    const logoPath = path.join(__dirname, 'logo.png');
+    doc.image(logoPath, M, 30, { width: 50, height: 50 });
+    
+    doc.fillColor('#ffffff').fontSize(22).font('Helvetica-Bold').text('ROYAL SERVICE CENTER', M + 65, 32);
+    doc.fillColor('#a1a1aa').fontSize(9).font('Helvetica').text('PREMIUM AUTOMOTIVE CARE', M + 65, 62, { characterSpacing: 1.5 });
+    doc.fillColor('#a1a1aa').fontSize(8).font('Helvetica').text('MONTHLY REPORT', PAGE_W - M - 180, 32, { width: 180, align: 'right' });
+    doc.fillColor('#ffffff').fontSize(11).font('Helvetica-Bold').text(`${monthName} ${year}`, PAGE_W - M - 180, 48, { width: 180, align: 'right' });
+    doc.fillColor('#a1a1aa').fontSize(8).font('Helvetica').text(`Generated: ${new Date().toLocaleString()}`, PAGE_W - M - 180, 68, { width: 180, align: 'right' });
+
+    let y = 145;
+    doc.fillColor(BRAND_DARK).fontSize(26).font('Helvetica-Bold').text('MONTHLY SUMMARY', M, y);
+    y += 40;
+
+    const totalBookings = bookings.length;
+    const completedBookings = bookings.filter(b => b.status === 'Completed');
+    const totalRevenue = completedBookings.reduce((sum, b) => sum + (b.total_price || 0), 0);
+    const cancelledCount = bookings.filter(b => ['Cancelled', 'Rejected'].includes(b.status)).length;
+
+    const halfW = (PAGE_W - M * 2 - 20) / 2;
+    const boxH = 60;
+
+    doc.rect(M, y, halfW, boxH).fill(LIGHT_GRAY);
+    doc.rect(M, y, 4, boxH).fill(BRAND_RED);
+    doc.fillColor(BRAND_RED).fontSize(8).font('Helvetica-Bold').text('TOTAL REVENUE', M + 15, y + 12, { characterSpacing: 1.2 });
+    doc.fillColor(BRAND_DARK).fontSize(20).font('Helvetica-Bold').text(`LKR ${totalRevenue.toLocaleString()}`, M + 15, y + 28);
+
+    const rightX = M + halfW + 20;
+    doc.rect(rightX, y, halfW, boxH).fill(LIGHT_GRAY);
+    doc.rect(rightX, y, 4, boxH).fill(BRAND_RED);
+    doc.fillColor(BRAND_RED).fontSize(8).font('Helvetica-Bold').text('TOTAL BOOKINGS', rightX + 15, y + 12, { characterSpacing: 1.2 });
+    doc.fillColor(BRAND_DARK).fontSize(20).font('Helvetica-Bold').text(totalBookings.toString(), rightX + 15, y + 28);
+
+    y += boxH + 30;
+
+    doc.fillColor(BRAND_DARK).fontSize(14).font('Helvetica-Bold').text('DETAILED BOOKINGS LIST', M, y);
+    y += 20;
+
+    const rowH = 20;
+    const cols = [M, M + 70, M + 200, M + 380, M + 480];
+    
+    doc.rect(M, y, PAGE_W - M * 2, rowH).fill(BRAND_DARK);
+    doc.fillColor('#ffffff').fontSize(8).font('Helvetica-Bold');
+    doc.text('DATE', cols[0] + 5, y + 6);
+    doc.text('REF', cols[1] + 5, y + 6);
+    doc.text('CUSTOMER', cols[2] + 5, y + 6);
+    doc.text('SERVICE', cols[3] + 5, y + 6);
+    doc.text('STATUS', cols[4] + 5, y + 6);
+    y += rowH;
+
+    doc.font('Helvetica').fontSize(8);
+    bookings.forEach((b, index) => {
+      if (y > PAGE_H - 100) {
+        doc.addPage();
+        y = M;
+        doc.rect(M, y, PAGE_W - M * 2, rowH).fill(BRAND_DARK);
+        doc.fillColor('#ffffff').fontSize(8).font('Helvetica-Bold');
+        doc.text('DATE', cols[0] + 5, y + 6);
+        doc.text('REF', cols[1] + 5, y + 6);
+        doc.text('CUSTOMER', cols[2] + 5, y + 6);
+        doc.text('SERVICE', cols[3] + 5, y + 6);
+        doc.text('STATUS', cols[4] + 5, y + 6);
+        y += rowH;
+        doc.font('Helvetica').fontSize(8);
+      }
+
+      const isEven = index % 2 === 0;
+      if (isEven) doc.rect(M, y, PAGE_W - M * 2, rowH).fill(LIGHT_GRAY);
+      
+      doc.fillColor(BRAND_DARK);
+      doc.text(b.booking_date || 'N/A', cols[0] + 5, y + 6);
+      doc.text(b.booking_ref || 'N/A', cols[1] + 5, y + 6);
+      doc.text(b.user_id?.name || 'N/A', cols[2] + 5, y + 6);
+      doc.text(b.service_id?.name || 'N/A', cols[3] + 5, y + 6);
+      doc.text(b.status || 'N/A', cols[4] + 5, y + 6);
+      
+      y += rowH;
+    });
+
+    doc.end();
+  } catch (error) {
+    console.error('Error generating monthly report:', error);
+    if (!res.headersSent) res.status(500).json({ message: error.message || 'Failed to generate report' });
   }
 };

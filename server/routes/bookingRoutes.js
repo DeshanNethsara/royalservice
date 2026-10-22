@@ -1,5 +1,5 @@
 import express from 'express';
-import rateLimit from 'express-rate-limit'; // 🚨 NEW: Import rateLimit
+import rateLimit from 'express-rate-limit';
 import {
   checkAvailability,
   getDateAvailability,
@@ -8,6 +8,7 @@ import {
   getAllBookings,
   updateBookingStatus,
   generateServiceRecordPDF,
+  generateMonthlyReportPDF, // 🚨 NEW: Import the report function
   assignStaff,
   deleteBooking,
   approvePayment,
@@ -45,6 +46,10 @@ router.get('/date/:date', getDateAvailability);
 
 // Create booking with file upload (Apply the limiter here)
 router.post('/', bookingLimiter, upload.single('payment_slip'), createBooking);
+
+// 🚨 NEW: Monthly Report Route (Admin only)
+// Must be placed BEFORE '/:id' routes so it isn't caught as an ID
+router.get('/report/monthly', authorize('admin'), generateMonthlyReportPDF);
 
 router.get('/:id/record', generateServiceRecordPDF);
 router.patch('/:id/assign', authorize('admin'), assignStaff);
