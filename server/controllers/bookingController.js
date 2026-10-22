@@ -508,7 +508,7 @@ export const generateServiceRecordPDF = async (req, res) => {
 };
 
 // ==========================================================
-// 🚨 NEW: GENERATE MONTHLY REPORT PDF
+// 🚨 GENERATE MONTHLY REPORT PDF (UPDATED ALIGNMENT & METRICS)
 // ==========================================================
 export const generateMonthlyReportPDF = async (req, res) => {
   try {
@@ -542,7 +542,6 @@ export const generateMonthlyReportPDF = async (req, res) => {
     const BRAND_DARK = '#18181b';
     const GRAY_TEXT = '#52525b';
     const LIGHT_GRAY = '#f4f4f5';
-    const BORDER_GRAY = '#e4e4e7';
 
     const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
     const monthName = monthNames[Number(month)];
@@ -564,24 +563,27 @@ export const generateMonthlyReportPDF = async (req, res) => {
     doc.fillColor(BRAND_DARK).fontSize(26).font('Helvetica-Bold').text('MONTHLY SUMMARY', M, y);
     y += 40;
 
+    // Advanced Metrics Calculation
     const totalBookings = bookings.length;
-    const completedBookings = bookings.filter(b => b.status === 'Completed');
-    const totalRevenue = completedBookings.reduce((sum, b) => sum + (b.total_price || 0), 0);
+    const completedBookingsCount = bookings.filter(b => b.status === 'Completed').length;
     const cancelledCount = bookings.filter(b => ['Cancelled', 'Rejected'].includes(b.status)).length;
+    const totalRevenue = bookings.filter(b => b.status === 'Completed').reduce((sum, b) => sum + (b.total_price || 0), 0);
 
-    const halfW = (PAGE_W - M * 2 - 20) / 2;
+    // 4-Box Summary Layout
+    const boxW = (PAGE_W - M * 2 - 30) / 4;
     const boxH = 60;
 
-    doc.rect(M, y, halfW, boxH).fill(LIGHT_GRAY);
-    doc.rect(M, y, 4, boxH).fill(BRAND_RED);
-    doc.fillColor(BRAND_RED).fontSize(8).font('Helvetica-Bold').text('TOTAL REVENUE', M + 15, y + 12, { characterSpacing: 1.2 });
-    doc.fillColor(BRAND_DARK).fontSize(20).font('Helvetica-Bold').text(`LKR ${totalRevenue.toLocaleString()}`, M + 15, y + 28);
+    const drawStatBox = (x, title, value, accentColor) => {
+        doc.rect(x, y, boxW, boxH).fill(LIGHT_GRAY);
+        doc.rect(x, y, 4, boxH).fill(accentColor);
+        doc.fillColor(accentColor).fontSize(7).font('Helvetica-Bold').text(title, x + 12, y + 12, { characterSpacing: 1.2 });
+        doc.fillColor(BRAND_DARK).fontSize(14).font('Helvetica-Bold').text(value, x + 12, y + 28);
+    };
 
-    const rightX = M + halfW + 20;
-    doc.rect(rightX, y, halfW, boxH).fill(LIGHT_GRAY);
-    doc.rect(rightX, y, 4, boxH).fill(BRAND_RED);
-    doc.fillColor(BRAND_RED).fontSize(8).font('Helvetica-Bold').text('TOTAL BOOKINGS', rightX + 15, y + 12, { characterSpacing: 1.2 });
-    doc.fillColor(BRAND_DARK).fontSize(20).font('Helvetica-Bold').text(totalBookings.toString(), rightX + 15, y + 28);
+    drawStatBox(M, 'TOTAL REVENUE', `LKR ${totalRevenue.toLocaleString()}`, BRAND_RED);
+    drawStatBox(M + boxW + 10, 'TOTAL BOOKINGS', totalBookings.toString(), BRAND_DARK);
+    drawStatBox(M + (boxW * 2) + 20, 'COMPLETED', completedBookingsCount.toString(), '#16a34a'); // Green accent
+    drawStatBox(M + (boxW * 3) + 30, 'CANCELLED', cancelledCount.toString(), '#ef4444'); // Red accent
 
     y += boxH + 30;
 
@@ -589,7 +591,9 @@ export const generateMonthlyReportPDF = async (req, res) => {
     y += 20;
 
     const rowH = 20;
-    const cols = [M, M + 70, M + 200, M + 380, M + 480];
+    
+    // Adjusted column spacing
+    const cols = [M, M + 70, M + 175, M + 310, M + 450]; 
     
     doc.rect(M, y, PAGE_W - M * 2, rowH).fill(BRAND_DARK);
     doc.fillColor('#ffffff').fontSize(8).font('Helvetica-Bold');
@@ -620,11 +624,11 @@ export const generateMonthlyReportPDF = async (req, res) => {
       if (isEven) doc.rect(M, y, PAGE_W - M * 2, rowH).fill(LIGHT_GRAY);
       
       doc.fillColor(BRAND_DARK);
-      doc.text(b.booking_date || 'N/A', cols[0] + 5, y + 6);
-      doc.text(b.booking_ref || 'N/A', cols[1] + 5, y + 6);
-      doc.text(b.user_id?.name || 'N/A', cols[2] + 5, y + 6);
-      doc.text(b.service_id?.name || 'N/A', cols[3] + 5, y + 6);
-      doc.text(b.status || 'N/A', cols[4] + 5, y + 6);
+      doc.text(b.booking_date || 'N/A', cols[0] + 5, y + 6, { width: 60, lineBreak: false });
+      doc.text(b.booking_ref || 'N/A', cols[1] + 5, y + 6, { width: 100, lineBreak: false });
+      doc.text(b.user_id?.name || 'N/A', cols[2] + 5, y + 6, { width: 125, ellipsis: true });
+      doc.text(b.service_id?.name || 'N/A', cols[3] + 5, y + 6, { width: 130, ellipsis: true });
+      doc.text(b.status || 'N/A', cols[4] + 5, y + 6, { width: 60, lineBreak: false });
       
       y += rowH;
     });
