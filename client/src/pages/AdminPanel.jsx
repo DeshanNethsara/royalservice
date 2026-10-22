@@ -881,7 +881,7 @@ export default function AdminPanel() {
                 </select>
               </div>
               
-              <div className="flex gap-3">
+              <div className="flex gap-3 items-center">
                 <button
                   onClick={handleGenerateReport}
                   className="bg-red-600 hover:bg-red-700 text-white font-bold py-2.5 px-6 rounded-lg transition-colors shadow-lg shadow-red-600/20"
@@ -889,7 +889,8 @@ export default function AdminPanel() {
                   Generate Report
                 </button>
                 
-                {reportData && (
+                {/* 🚨 FIXED: Only show download button if there are records */}
+                {reportData && reportData.bookings.length > 0 && (
                   <button
                     onClick={handleDownloadPDFReport}
                     className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 px-5 rounded-lg transition-colors shadow-lg shadow-emerald-600/20"
@@ -899,6 +900,13 @@ export default function AdminPanel() {
                     </svg>
                     Download PDF
                   </button>
+                )}
+
+                {/* Optional: Show a badge if report is empty */}
+                {reportData && reportData.bookings.length === 0 && (
+                  <span className="text-xs font-bold text-amber-500 bg-amber-500/10 border border-amber-500/20 px-3 py-2 rounded-lg">
+                    No records to download
+                  </span>
                 )}
               </div>
             </div>
