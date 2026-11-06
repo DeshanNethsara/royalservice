@@ -167,9 +167,10 @@ export default function Chat() {
       }
     });
 
-    // 🚨 FIX: Load initial unread counts from backend
+    // 🚨 FIXED: Load initial unread counts from backend
     const handleContactsList = (list) => {
       setContacts(list);
+      
       const initialCounts = {};
       list.forEach(contact => {
         if (contact.unreadCount > 0) {

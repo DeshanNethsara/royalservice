@@ -41,6 +41,13 @@ const io = new Server(httpServer, {
 
 await connectDB();
 
+// 🚨 NEW: One-time cleanup to fix old messages
+Message.updateMany(
+  { isRead: { $exists: false } },
+  { $set: { isRead: false } }
+).then(() => console.log('✅ Legacy messages updated to isRead: false'))
+ .catch(err => console.error('Error updating messages:', err));
+
 startReminderService();
 
 const corsOptions = {
@@ -126,11 +133,11 @@ io.on('connection', (socket) => {
           const lastMessage = await Message.findOne({ threadId: String(contact._id) })
             .sort({ createdAt: -1 }).select('createdAt text');
 
-          // 🚨 FIX: Count unread messages sent by the customer
+          // 🚨 FIXED: Counts 'false' AND 'undefined' messages
           const unreadCount = await Message.countDocuments({
             threadId: String(contact._id),
             senderRole: 'customer',
-            isRead: false
+            isRead: { $ne: true } 
           });
 
           return {
@@ -138,7 +145,7 @@ io.on('connection', (socket) => {
             isOnline: onlineUsers.has(contact._id.toString()),
             lastMessageAt: lastMessage ? lastMessage.createdAt : null,
             lastMessageText: lastMessage ? lastMessage.text : null,
-            unreadCount // 🚨 Send this to frontend
+            unreadCount 
           };
         })
       );
@@ -178,7 +185,6 @@ io.on('connection', (socket) => {
         senderRole: data.senderRole,
         threadId: String(data.threadId),
         text: data.text.trim(),
-        // 🚨 FIX: Default to unread (false) for new customer messages
         isRead: data.senderRole !== 'customer' 
       };
 
@@ -256,12 +262,12 @@ io.on('connection', (socket) => {
     }
   });
 
-  // 🚨 FIX: Actually update the database when messages are read
+  // 🚨 FIXED: Actually update the database when messages are read
   socket.on('mark_read', async ({ threadId, userId }) => {
     try {
       if (!threadId) return;
       await Message.updateMany(
-        { threadId: String(threadId), senderRole: 'customer', isRead: false },
+        { threadId: String(threadId), senderRole: 'customer', isRead: { $ne: true } },
         { $set: { isRead: true } }
       );
       console.log(`Messages marked as read - Thread: ${threadId}`);
