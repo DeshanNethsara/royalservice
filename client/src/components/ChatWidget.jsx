@@ -1,7 +1,9 @@
 import React, { useState, useContext, useEffect, useRef, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom'; // 🚨 Import useNavigate
 import { AuthContext } from '../context/AuthContext';
 import axiosClient from '../api/axiosClient';
 import io from 'socket.io-client';
+import toast from 'react-hot-toast'; // 🚨 Import toast for login prompt
 
 const SOCKET_URL = import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5000';
 const socket = io(SOCKET_URL, {
@@ -11,12 +13,10 @@ const socket = io(SOCKET_URL, {
 
 export default function ChatWidget() {
   const { user } = useContext(AuthContext);
+  const navigate = useNavigate(); // 🚨 Initialize navigate
   
-  // Widget specific state
   const [isOpen, setIsOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
-
-  // Chat state
   const [message, setMessage] = useState('');
   const [messages, setMessages] = useState([]);
   const [activeContact, setActiveContact] = useState(null);
@@ -31,8 +31,8 @@ export default function ChatWidget() {
 
   const getUserId = useCallback(() => user?._id || user?.id, [user]);
 
-  // Only block Admins. Allow both customers and staff.
-  if (!user || user.role === 'admin') return null;
+  // 🚨 FIX: Only block admins. Allow guests (null user) to see the button.
+  const isUserLoggedIn = !!user && user.role !== 'admin';
 
   const quickCommands = [
     { id: 'booking', label: '📅 How to Book', question: 'How do I book an appointment?' },
@@ -73,6 +73,8 @@ export default function ChatWidget() {
   }, []);
 
   useEffect(() => {
+    if (!isUserLoggedIn) return; // Don't connect socket if not logged in
+
     const userId = getUserId();
     socket.connect();
 
@@ -89,7 +91,6 @@ export default function ChatWidget() {
     const handleIncomingMessage = (newMessage) => {
       if (String(newMessage.threadId) !== String(userId)) return;
       
-      // If the widget is closed and message is from Admin/Bot, show notification
       if (!isOpen && String(newMessage.senderId) !== String(userId)) {
         setUnreadCount(prev => prev + 1);
         const audio = new Audio('/notification.mp3');
@@ -128,9 +129,8 @@ export default function ChatWidget() {
       socket.off('stop_typing', handleStopTyping);
       socket.disconnect();
     };
-  }, [user, isOpen, getUserId, addMessageIfNew]);
+  }, [isUserLoggedIn, user, isOpen, getUserId, addMessageIfNew]);
 
-  // Fetch history when opening
   useEffect(() => {
     if (isOpen && activeContact) {
       activeThreadRef.current = activeContact._id;
@@ -140,7 +140,6 @@ export default function ChatWidget() {
     }
   }, [isOpen, activeContact]);
 
-  // Scroll to bottom on new message
   useEffect(() => {
     if (isOpen) messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isOpen, isTyping]);
@@ -161,7 +160,6 @@ export default function ChatWidget() {
     setMessage('');
     socket.emit('stop_typing', { threadId: activeContact._id, userId });
 
-    // Auto-reply for first message
     if (!hasSentFirstMessageRef.current) {
       hasSentFirstMessageRef.current = true;
       setTimeout(() => {
@@ -195,113 +193,117 @@ export default function ChatWidget() {
     }, 1000);
   };
 
-  const formatTime = (timestamp) => {
-    if (!timestamp) return '';
-    return new Date(timestamp).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
-  };
-
   return (
     <div className="fixed bottom-6 right-6 z-[100] font-sans flex flex-col items-end pointer-events-none">
       
-      {/* Chat Window */}
-      <div 
-        className={`bg-white rounded-2xl shadow-2xl border border-zinc-200 w-[350px] md:w-[380px] overflow-hidden transition-all duration-300 transform origin-bottom-right flex flex-col pointer-events-auto mb-4 ${
-          isOpen ? 'scale-100 opacity-100 h-[500px]' : 'scale-0 opacity-0 h-0 w-0 absolute bottom-16 right-0'
-        }`}
-      >
-        {/* Header */}
-        <div className="bg-[#18181b] p-4 flex justify-between items-center shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-red-600 flex items-center justify-center text-white font-bold text-lg shadow-inner">
-              R
-            </div>
-            <div>
-              <h3 className="text-white font-bold text-sm leading-tight">Royal Support</h3>
-              <p className="text-emerald-400 text-[10px] font-bold uppercase tracking-widest flex items-center gap-1">
-                <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse"></span> 
-                {isTyping ? `${typingUser} is typing...` : 'Online'}
-              </p>
-            </div>
-          </div>
-          <button onClick={() => setIsOpen(false)} className="text-zinc-400 hover:text-white transition-colors p-1">
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
-          </button>
-        </div>
-
-        {/* Messages Area */}
-        <div ref={messagesContainerRef} className="flex-1 bg-zinc-50 p-4 overflow-y-auto space-y-4">
-          
-          <div className="flex flex-col items-start">
-            <span className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider mb-1">Royal Support</span>
-            <div className="bg-white border border-zinc-200 text-zinc-700 p-3 rounded-2xl rounded-tl-sm text-sm shadow-sm">
-              Welcome to Royal Service Center! 👋<br/><br/>How can we assist you today?
-            </div>
-          </div>
-
-          {messages.map((msg, index) => {
-            const isMe = String(msg.senderId) === String(getUserId());
-            const isBot = msg.senderRole === 'bot';
-            return (
-              <div key={msg._id || index} className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}>
-                <span className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider mb-1">
-                  {isMe ? 'You' : isBot ? 'Bot' : msg.senderName}
-                </span>
-                <div className={`max-w-[85%] p-3 rounded-2xl text-sm ${
-                  isMe ? 'bg-red-600 text-white rounded-tr-sm shadow-md' 
-                  : isBot ? 'bg-purple-100 border border-purple-200 text-purple-900 rounded-tl-sm'
-                  : 'bg-white border border-zinc-200 text-zinc-700 rounded-tl-sm shadow-sm'
-                }`}>
-                  <p className="whitespace-pre-wrap">{msg.text}</p>
-                </div>
+      {/* 🚨 FIX: Only render chat window if user is logged in AND widget is open */}
+      {isUserLoggedIn && (
+        <div 
+          className={`bg-white rounded-2xl shadow-2xl border border-zinc-200 w-[350px] md:w-[380px] overflow-hidden transition-all duration-300 transform origin-bottom-right flex flex-col pointer-events-auto mb-4 ${
+            isOpen ? 'scale-100 opacity-100 h-[500px]' : 'scale-0 opacity-0 h-0 w-0 absolute bottom-16 right-0'
+          }`}
+        >
+          {/* Header */}
+          <div className="bg-[#18181b] p-4 flex justify-between items-center shrink-0">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-red-600 flex items-center justify-center text-white font-bold text-lg shadow-inner">
+                R
               </div>
-            );
-          })}
-          <div ref={messagesEndRef} />
-        </div>
+              <div>
+                <h3 className="text-white font-bold text-sm leading-tight">Royal Support</h3>
+                <p className="text-emerald-400 text-[10px] font-bold uppercase tracking-widest flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse"></span> 
+                  {isTyping ? `${typingUser} is typing...` : 'Online'}
+                </p>
+              </div>
+            </div>
+            <button onClick={() => setIsOpen(false)} className="text-zinc-400 hover:text-white transition-colors p-1">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
+            </button>
+          </div>
 
-        {/* Quick Commands - UPDATED TO WRAP */}
-        <div className="px-3 py-2 bg-white border-t border-zinc-100 shrink-0">
-          <div className="flex flex-wrap gap-2 max-h-[80px] overflow-y-auto hide-scrollbar">
-            {quickCommands.map((cmd) => (
-              <button
-                key={cmd.id}
-                onClick={() => handleQuickCommand(cmd)}
-                className="px-3 py-1.5 rounded-full text-[11px] font-bold bg-zinc-100 hover:bg-red-100 hover:text-red-600 text-zinc-600 transition-all border border-zinc-200"
+          {/* Messages Area */}
+          <div ref={messagesContainerRef} className="flex-1 bg-zinc-50 p-4 overflow-y-auto space-y-4">
+            
+            <div className="flex flex-col items-start">
+              <span className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider mb-1">Royal Support</span>
+              <div className="bg-white border border-zinc-200 text-zinc-700 p-3 rounded-2xl rounded-tl-sm text-sm shadow-sm">
+                Welcome to Royal Service Center! 👋<br/><br/>How can we assist you today?
+              </div>
+            </div>
+
+            {messages.map((msg, index) => {
+              const isMe = String(msg.senderId) === String(getUserId());
+              const isBot = msg.senderRole === 'bot';
+              return (
+                <div key={msg._id || index} className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}>
+                  <span className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider mb-1">
+                    {isMe ? 'You' : isBot ? 'Bot' : msg.senderName}
+                  </span>
+                  <div className={`max-w-[85%] p-3 rounded-2xl text-sm ${
+                    isMe ? 'bg-red-600 text-white rounded-tr-sm shadow-md' 
+                    : isBot ? 'bg-purple-100 border border-purple-200 text-purple-900 rounded-tl-sm'
+                    : 'bg-white border border-zinc-200 text-zinc-700 rounded-tl-sm shadow-sm'
+                  }`}>
+                    <p className="whitespace-pre-wrap">{msg.text}</p>
+                  </div>
+                </div>
+              );
+            })}
+            <div ref={messagesEndRef} />
+          </div>
+
+          {/* Quick Commands */}
+          <div className="px-3 py-2 bg-white border-t border-zinc-100 shrink-0">
+            <div className="flex flex-wrap gap-2 max-h-[80px] overflow-y-auto hide-scrollbar">
+              {quickCommands.map((cmd) => (
+                <button
+                  key={cmd.id}
+                  onClick={() => handleQuickCommand(cmd)}
+                  className="px-3 py-1.5 rounded-full text-[11px] font-bold bg-zinc-100 hover:bg-red-100 hover:text-red-600 text-zinc-600 transition-all border border-zinc-200"
+                >
+                  {cmd.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Input Area */}
+          <div className="p-3 bg-white border-t border-zinc-100 shrink-0">
+            <form onSubmit={handleSendMessage} className="flex gap-2">
+              <input
+                type="text"
+                value={message}
+                onChange={handleInputChange}
+                placeholder="Type your message..."
+                className="flex-1 bg-zinc-100 border border-zinc-200 text-zinc-800 px-4 py-2.5 rounded-xl focus:border-red-500 focus:outline-none text-sm placeholder:text-zinc-500"
+              />
+              <button 
+                type="submit"
+                disabled={!message.trim()}
+                className="bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white w-10 h-10 rounded-xl flex items-center justify-center transition-colors shadow-md shrink-0"
               >
-                {cmd.label}
+                <svg className="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                </svg>
               </button>
-            ))}
+            </form>
           </div>
         </div>
+      )}
 
-        {/* Input Area */}
-        <div className="p-3 bg-white border-t border-zinc-100 shrink-0">
-          <form onSubmit={handleSendMessage} className="flex gap-2">
-            <input
-              type="text"
-              value={message}
-              onChange={handleInputChange}
-              placeholder="Type your message..."
-              className="flex-1 bg-zinc-100 border border-zinc-200 text-zinc-800 px-4 py-2.5 rounded-xl focus:border-red-500 focus:outline-none text-sm placeholder:text-zinc-500"
-            />
-            <button 
-              type="submit"
-              disabled={!message.trim()}
-              className="bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white w-10 h-10 rounded-xl flex items-center justify-center transition-colors shadow-md shrink-0"
-            >
-              {/* 🚨 FIXED: Clean Paper Plane Send Icon */}
-              <svg className="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-              </svg>
-            </button>
-          </form>
-        </div>
-      </div>
-
-      {/* Floating Button */}
-      {!isOpen && (
+      {/* Floating Button - 🚨 ALWAYS VISIBLE (except for admins) */}
+      {!isOpen && user?.role !== 'admin' && (
         <button
-          onClick={() => setIsOpen(true)}
+          onClick={() => {
+            if (!user) {
+              // 🚨 Show a toast and redirect to login
+              toast.error('Please log in to chat with our support team.');
+              navigate('/login');
+              return;
+            }
+            setIsOpen(true);
+          }}
           className="relative flex items-center gap-2 bg-gradient-to-br from-red-500 via-red-600 to-red-700 hover:from-red-600 hover:via-red-700 hover:to-red-800 text-white pl-3 pr-5 py-3 rounded-full shadow-2xl pointer-events-auto transition-all duration-300 hover:scale-105"
         >
           <span className="relative w-8 h-8 rounded-full bg-white/15 backdrop-blur-sm flex items-center justify-center flex-shrink-0">
