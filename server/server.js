@@ -7,6 +7,7 @@ import { Server } from 'socket.io';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import mongoSanitize from '@exortek/express-mongo-sanitize';
+import bcrypt from 'bcryptjs'; // 🚨 Import bcrypt for password verification
 
 import connectDB from './configs/db.js';
 import Message from './models/Message.js';
@@ -116,13 +117,18 @@ io.on('connection', (socket) => {
 
   socket.on('fetch_contacts', async () => {
     try {
-      const contacts = await User.find({
-        role: { $in: ['customer', 'staff'] }
-      }).select('name email role').sort({ role: 1, name: 1 });
+      // If the requester is staff, ONLY show Admins.
+      // If the requester is admin, show Customers and Staff.
+      const roleFilter = socket.userRole === 'staff' 
+        ? { role: 'admin' } 
+        : { role: { $in: ['customer', 'staff'] } };
+
+      const contacts = await User.find(roleFilter)
+        .select('name email role')
+        .sort({ role: 1, name: 1 });
 
       const contactsWithLastMessage = await Promise.all(
         contacts.map(async (contact) => {
-          // Added 'text' to the select query
           const lastMessage = await Message.findOne({ threadId: String(contact._id) })
             .sort({ createdAt: -1 }).select('createdAt text');
 
@@ -130,7 +136,6 @@ io.on('connection', (socket) => {
             ...contact.toObject(),
             isOnline: onlineUsers.has(contact._id.toString()),
             lastMessageAt: lastMessage ? lastMessage.createdAt : null,
-            // Send the text to the frontend so the sidebar can show a preview
             lastMessageText: lastMessage ? lastMessage.text : null 
           };
         })
@@ -179,7 +184,6 @@ io.on('connection', (socket) => {
 
       io.emit('newMessage', newMsg); 
       
-      // 🚨 FIXED: Now sending the text so the sidebar preview updates instantly
       io.emit('contact_updated', {
         threadId: String(data.threadId),
         lastMessageAt: newMsg.createdAt,
@@ -216,6 +220,38 @@ io.on('connection', (socket) => {
       io.emit('chat_deleted', { threadId: String(threadId) });
     } catch (err) {
       console.error('Error deleting chat:', err);
+    }
+  });
+
+  // 🚨 NEW: Password-protected clear all chats
+  socket.on('clear_all_chats', async ({ userId, password }) => {
+    try {
+      if (!userId || !password) {
+        socket.emit('clear_all_chats_error', 'Missing credentials');
+        return;
+      }
+
+      const adminUser = await User.findById(userId);
+      if (!adminUser || adminUser.role !== 'admin') {
+        socket.emit('clear_all_chats_error', 'Unauthorized action');
+        return;
+      }
+
+      // Check password
+      const isMatch = await bcrypt.compare(password, adminUser.password);
+      if (!isMatch) {
+        socket.emit('clear_all_chats_error', 'Incorrect password');
+        return;
+      }
+
+      // Password correct, delete all messages
+      await Message.deleteMany({}); 
+      io.emit('all_chats_cleared');
+      console.log(`All chats cleared successfully by Admin: ${adminUser.name}`);
+      
+    } catch (err) {
+      console.error('Error clearing all chats:', err);
+      socket.emit('clear_all_chats_error', 'Server error during clearing');
     }
   });
 

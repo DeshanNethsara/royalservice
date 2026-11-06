@@ -210,6 +210,7 @@ export default function Chat() {
         });
       });
     };
+    
     const handleChatHistory = (history) => {
       setMessages(history || []);
       if (user.role !== 'admin') {
@@ -217,9 +218,7 @@ export default function Chat() {
       }
     };
     
-    // 🚨 FIX: Combine listeners to catch both 'receive_message' and 'newMessage'
     const handleIncomingMessage = (newMessage) => {
-      // For customers, only process messages for their own thread
       if (user.role !== 'admin' && String(newMessage.threadId) !== String(userId)) return;
       
       if (String(newMessage.threadId) === String(activeThreadRef.current)) {
@@ -228,7 +227,6 @@ export default function Chat() {
       } else if (user.role === 'admin') {
         toast.success(`New message from ${newMessage.senderName}`);
         
-        // 🚨 UPDATE CONTACT LIST IN REAL-TIME FOR ADMIN
         setContacts(prev => {
           const updated = prev.map(c => 
             String(c._id) === String(newMessage.threadId) 
@@ -254,6 +252,7 @@ export default function Chat() {
         toast.success('Chat cleared');
       }
     };
+    
     const handleChatDeleted = ({ threadId }) => {
       setContacts(prev => prev.filter(c => String(c._id) !== String(threadId)));
       if (String(threadId) === String(activeThreadRef.current)) {
@@ -263,6 +262,7 @@ export default function Chat() {
         toast.success('Chat deleted successfully');
       }
     };
+    
     const handleTyping = ({ threadId, userName }) => {
       if (String(threadId) === String(activeThreadRef.current)) {
         setIsTyping(true);
@@ -276,20 +276,30 @@ export default function Chat() {
       }
     };
 
+    // 🚨 NEW: Handle success/failure of clearing all chats
+    const handleAllChatsCleared = () => {
+      setMessages([]);
+      setContacts(prev => prev.map(c => ({ ...c, lastMessageText: null, lastMessageAt: null })));
+      toast.success('All chats have been cleared');
+    };
+
+    const handleClearAllError = (msg) => {
+      toast.error(msg || 'Failed to clear all chats');
+    };
+
     socket.on('contacts_list', handleContactsList);
     socket.on('user_online', handleUserOnline);
     socket.on('user_offline', handleUserOffline);
     socket.on('contact_updated', handleContactUpdated);
     socket.on('chat_history', handleChatHistory);
-    
-    // 🚨 Listen to both possible backend event names
     socket.on('receive_message', handleIncomingMessage);
     socket.on('newMessage', handleIncomingMessage); 
-
     socket.on('chat_cleared', handleChatCleared);
     socket.on('chat_deleted', handleChatDeleted);
     socket.on('typing', handleTyping);
     socket.on('stop_typing', handleStopTyping);
+    socket.on('all_chats_cleared', handleAllChatsCleared); // 🚨 New
+    socket.on('clear_all_chats_error', handleClearAllError); // 🚨 New
 
     return () => {
       socket.off('contacts_list', handleContactsList);
@@ -303,6 +313,8 @@ export default function Chat() {
       socket.off('chat_deleted', handleChatDeleted);
       socket.off('typing', handleTyping);
       socket.off('stop_typing', handleStopTyping);
+      socket.off('all_chats_cleared', handleAllChatsCleared); // 🚨 New
+      socket.off('clear_all_chats_error', handleClearAllError); // 🚨 New
       if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
       socket.disconnect();
     };
@@ -387,6 +399,17 @@ export default function Chat() {
     setContextMenu(null);
   };
 
+  // 🚨 NEW: Prompt for password and emit clear_all_chats
+  const handleClearAllChats = () => {
+    if (!window.confirm('WARNING: This will permanently delete ALL chats for ALL customers. Are you sure?')) return;
+    
+    const password = window.prompt('Please enter your Admin password to confirm:');
+    
+    if (password) {
+      socket.emit('clear_all_chats', { userId: user._id, password });
+    }
+  };
+
   const handleInputChange = (e) => {
     setMessage(e.target.value);
     if (!activeContact || !user) return;
@@ -462,9 +485,18 @@ export default function Chat() {
 
         {user?.role === 'admin' && (
           <aside className={`w-full md:w-72 lg:w-80 bg-zinc-900 border border-zinc-800 rounded-2xl flex-col overflow-hidden shrink-0 shadow-2xl min-h-0 ${isMobileChatOpen ? 'hidden md:flex' : 'flex'}`}>
-            <div className="p-4 border-b border-zinc-800 bg-zinc-950/50 shrink-0">
+            
+            {/* 🚨 NEW: Sidebar Header with Clear All Button */}
+            <div className="p-4 border-b border-zinc-800 bg-zinc-950/50 shrink-0 flex justify-between items-center">
               <h3 className="text-xs font-bold text-zinc-500 uppercase tracking-widest">Active Personnel</h3>
+              <button 
+                onClick={handleClearAllChats}
+                className="text-[10px] font-bold uppercase tracking-wider text-red-500 hover:text-white bg-red-600/10 hover:bg-red-600 px-3 py-1.5 rounded transition-colors"
+              >
+                Clear All
+              </button>
             </div>
+
             <div className="flex-1 min-h-0 overflow-y-auto p-3 space-y-2">
               {contacts.length === 0 ? (
                 <div className="text-center py-8 text-zinc-600 text-sm">No contacts online</div>
@@ -493,12 +525,10 @@ export default function Chat() {
                         </div>
                         
                         <div className="flex-1 min-w-0">
-                          {/* 🚨 Highlight name in white if unread, otherwise grey */}
                           <p className={`font-bold text-sm truncate ${hasUnread ? 'text-white' : 'text-zinc-300'}`}>
                             {contact.name}
                           </p>
                           
-                          {/* 🚨 Message Preview */}
                           {contact.lastMessageText ? (
                             <p className={`text-xs truncate max-w-[150px] ${hasUnread ? 'text-red-400 font-medium' : 'text-zinc-500'}`}>
                               {contact.lastMessageText}
