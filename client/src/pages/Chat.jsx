@@ -297,7 +297,6 @@ export default function Chat() {
       toast.error(msg || 'Failed to clear all chats');
     };
 
-    // 🚨 ADD THIS EVENT LISTENER
     const handleChatRead = ({ threadId }) => {
       setUnreadCounts(prev => {
         const updated = { ...prev };
@@ -319,7 +318,7 @@ export default function Chat() {
     socket.on('stop_typing', handleStopTyping);
     socket.on('all_chats_cleared', handleAllChatsCleared);
     socket.on('clear_all_chats_error', handleClearAllError);
-    socket.on('chat_read', handleChatRead); // 🚨 LISTEN FOR THE EVENT
+    socket.on('chat_read', handleChatRead); 
 
     return () => {
       socket.off('contacts_list', handleContactsList);
@@ -335,7 +334,7 @@ export default function Chat() {
       socket.off('stop_typing', handleStopTyping);
       socket.off('all_chats_cleared', handleAllChatsCleared);
       socket.off('clear_all_chats_error', handleClearAllError);
-      socket.off('chat_read', handleChatRead); // 🚨 CLEAN IT UP
+      socket.off('chat_read', handleChatRead); 
       if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
       socket.disconnect();
     };
@@ -547,18 +546,19 @@ export default function Chat() {
                         </div>
                         
                         <div className="flex-1 min-w-0">
-                          <p className={`font-bold text-sm truncate ${hasUnread ? 'text-white' : 'text-zinc-300'}`}>
-                            {contact.name}
-                          </p>
-                          
-                          {contact.lastMessageText ? (
-                            <p className={`text-xs truncate max-w-[150px] ${hasUnread ? 'text-red-400 font-medium' : 'text-zinc-500'}`}>
-                              {contact.lastMessageText}
+                          <div className="flex items-center gap-2">
+                            <p className={`font-bold text-sm truncate ${hasUnread ? 'text-white' : 'text-zinc-300'}`}>
+                              {contact.name}
                             </p>
-                          ) : (
-                            <span className={`text-[9px] font-black uppercase tracking-widest mt-1 inline-block px-2 py-0.5 rounded border ${contact.role === 'staff' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' : 'bg-zinc-800 text-zinc-400 border-zinc-700'}`}>
+                            <span className={`text-[8px] shrink-0 font-black uppercase tracking-widest px-1.5 py-0.5 rounded border ${contact.role === 'staff' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' : 'bg-zinc-800 text-zinc-400 border-zinc-700'}`}>
                               {contact.role}
                             </span>
+                          </div>
+                          
+                          {contact.lastMessageText && (
+                            <p className={`text-[11px] mt-0.5 truncate max-w-[160px] ${hasUnread ? 'text-red-400 font-medium' : 'text-zinc-500'}`}>
+                              {contact.lastMessageText}
+                            </p>
                           )}
                         </div>
                         
@@ -586,7 +586,6 @@ export default function Chat() {
                   <button
                     onClick={() => {
                       setIsMobileChatOpen(false);
-                      // 🚨 ALSO FORGET THE ACTIVE THREAD HERE
                       setActiveContact(null);
                       activeThreadRef.current = null;
                     }}
