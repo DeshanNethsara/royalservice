@@ -276,7 +276,6 @@ export default function Chat() {
       }
     };
 
-    // 🚨 NEW: Handle success/failure of clearing all chats
     const handleAllChatsCleared = () => {
       setMessages([]);
       setContacts(prev => prev.map(c => ({ ...c, lastMessageText: null, lastMessageAt: null })));
@@ -298,8 +297,8 @@ export default function Chat() {
     socket.on('chat_deleted', handleChatDeleted);
     socket.on('typing', handleTyping);
     socket.on('stop_typing', handleStopTyping);
-    socket.on('all_chats_cleared', handleAllChatsCleared); // 🚨 New
-    socket.on('clear_all_chats_error', handleClearAllError); // 🚨 New
+    socket.on('all_chats_cleared', handleAllChatsCleared);
+    socket.on('clear_all_chats_error', handleClearAllError);
 
     return () => {
       socket.off('contacts_list', handleContactsList);
@@ -313,8 +312,8 @@ export default function Chat() {
       socket.off('chat_deleted', handleChatDeleted);
       socket.off('typing', handleTyping);
       socket.off('stop_typing', handleStopTyping);
-      socket.off('all_chats_cleared', handleAllChatsCleared); // 🚨 New
-      socket.off('clear_all_chats_error', handleClearAllError); // 🚨 New
+      socket.off('all_chats_cleared', handleAllChatsCleared);
+      socket.off('clear_all_chats_error', handleClearAllError);
       if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
       socket.disconnect();
     };
@@ -399,7 +398,6 @@ export default function Chat() {
     setContextMenu(null);
   };
 
-  // 🚨 NEW: Prompt for password and emit clear_all_chats
   const handleClearAllChats = () => {
     if (!window.confirm('WARNING: This will permanently delete ALL chats for ALL customers. Are you sure?')) return;
     
@@ -486,7 +484,6 @@ export default function Chat() {
         {user?.role === 'admin' && (
           <aside className={`w-full md:w-72 lg:w-80 bg-zinc-900 border border-zinc-800 rounded-2xl flex-col overflow-hidden shrink-0 shadow-2xl min-h-0 ${isMobileChatOpen ? 'hidden md:flex' : 'flex'}`}>
             
-            {/* 🚨 NEW: Sidebar Header with Clear All Button */}
             <div className="p-4 border-b border-zinc-800 bg-zinc-950/50 shrink-0 flex justify-between items-center">
               <h3 className="text-xs font-bold text-zinc-500 uppercase tracking-widest">Active Personnel</h3>
               <button 
@@ -576,11 +573,21 @@ export default function Chat() {
                 </div>
                 <div>
                   <span className="font-bold text-white text-sm">{user?.role === 'admin' ? activeContact.name : 'Royal Service Center'}</span>
-                  <p className="text-[10px] text-zinc-500">
-                    {isTyping 
-                      ? `${typingUser} is typing...` 
-                      : (user?.role === 'admin' ? (activeContact.isOnline ? 'online' : 'offline') : 'online')}
-                  </p>
+                  
+                  {/* 🚨 NEW: Show phone number and status */}
+                  <div className="flex items-center gap-2 text-[10px] text-zinc-500 mt-0.5">
+                    {user?.role === 'admin' && activeContact.phone && (
+                      <span>{activeContact.phone}</span>
+                    )}
+                    {user?.role === 'admin' && activeContact.phone && <span>•</span>}
+                    
+                    <span>
+                      {isTyping 
+                        ? `${typingUser} is typing...` 
+                        : (user?.role === 'admin' ? (activeContact.isOnline ? 'online' : 'offline') : 'online')}
+                    </span>
+                  </div>
+
                 </div>
               </div>
               <button

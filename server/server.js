@@ -7,7 +7,7 @@ import { Server } from 'socket.io';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import mongoSanitize from '@exortek/express-mongo-sanitize';
-import bcrypt from 'bcryptjs'; // 🚨 Import bcrypt for password verification
+import bcrypt from 'bcryptjs'; 
 
 import connectDB from './configs/db.js';
 import Message from './models/Message.js';
@@ -18,7 +18,6 @@ import userRoutes from './routes/userRoutes.js';
 import serviceRoutes from './routes/serviceRoutes.js';
 import bookingRoutes from './routes/bookingRoutes.js';
 
-// 🚨 Import the reminder service
 import { startReminderService } from './utils/bookingReminder.js';
 
 const app = express();
@@ -42,7 +41,6 @@ const io = new Server(httpServer, {
 
 await connectDB();
 
-// 🚨 Start the cron job for 5-hour reminders
 startReminderService();
 
 const corsOptions = {
@@ -78,7 +76,6 @@ const onlineUsers = new Map();
 io.on('connection', (socket) => {
   console.log(`User connected to Comms-Link: ${socket.id}`);
 
-  // Handle the 'joinRoom' event from the frontend
   socket.on('joinRoom', (userId) => {
     socket.join(userId);
     console.log(`Socket ${socket.id} joined room ${userId}`);
@@ -90,7 +87,6 @@ io.on('connection', (socket) => {
       socket.userId = userId;
       socket.userRole = role;
       
-      // Make sure they are in their own room
       socket.join(userId);
 
       if (role === 'admin') {
@@ -117,14 +113,13 @@ io.on('connection', (socket) => {
 
   socket.on('fetch_contacts', async () => {
     try {
-      // If the requester is staff, ONLY show Admins.
-      // If the requester is admin, show Customers and Staff.
       const roleFilter = socket.userRole === 'staff' 
         ? { role: 'admin' } 
         : { role: { $in: ['customer', 'staff'] } };
 
+      // 🚨 FIX: Added 'phone' to the select query
       const contacts = await User.find(roleFilter)
-        .select('name email role')
+        .select('name email role phone')
         .sort({ role: 1, name: 1 });
 
       const contactsWithLastMessage = await Promise.all(
@@ -223,7 +218,6 @@ io.on('connection', (socket) => {
     }
   });
 
-  // 🚨 NEW: Password-protected clear all chats
   socket.on('clear_all_chats', async ({ userId, password }) => {
     try {
       if (!userId || !password) {
@@ -237,14 +231,12 @@ io.on('connection', (socket) => {
         return;
       }
 
-      // Check password
       const isMatch = await bcrypt.compare(password, adminUser.password);
       if (!isMatch) {
         socket.emit('clear_all_chats_error', 'Incorrect password');
         return;
       }
 
-      // Password correct, delete all messages
       await Message.deleteMany({}); 
       io.emit('all_chats_cleared');
       console.log(`All chats cleared successfully by Admin: ${adminUser.name}`);
