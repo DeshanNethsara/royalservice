@@ -37,7 +37,7 @@ const userSchema = new mongoose.Schema(
       default: "" 
     },
 
-    // 🚨 NEW FIELDS FOR PASSWORD RESET
+    // 🚨 FIELDS FOR PASSWORD RESET
     resetPasswordToken: { 
       type: String,
       default: null 
@@ -47,7 +47,7 @@ const userSchema = new mongoose.Schema(
       default: null 
     },
 
-    // 🚨 NEW FIELDS FOR EXPONENTIAL BACKOFF
+    // 🚨 FIELDS FOR EXPONENTIAL BACKOFF (Password Reset Requests)
     resetPasswordLastSent: { 
       type: Date,
       default: null 
@@ -55,6 +55,16 @@ const userSchema = new mongoose.Schema(
     resetPasswordAttempts: { 
       type: Number,
       default: 0 
+    },
+
+    // 🚨 NEW FIELDS FOR LOGIN LOCKOUT
+    loginAttempts: {
+      type: Number,
+      default: 0
+    },
+    lockUntil: {
+      type: Date,
+      default: null
     }
   },
   { 

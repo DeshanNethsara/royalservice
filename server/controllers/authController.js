@@ -47,22 +47,65 @@ export const login = async (req, res) => {
   try {
     const user = await User.findOne({ email });
 
-    // 1. Check if account is suspended (if user exists)
+    // 1. Check if account is suspended
     if (user && user.status === 0) {
       return res.status(403).json({ message: 'Account is suspended. Contact administrator.' });
     }
 
-    // 2. Check if user exists AND password matches
+    // 2. 🚨 CHECK IF ACCOUNT IS LOCKED
+    if (user && user.lockUntil && user.lockUntil > Date.now()) {
+      const minutesLeft = Math.ceil((user.lockUntil - Date.now()) / 60000);
+      return res.status(403).json({ 
+        message: `Account is temporarily locked due to multiple failed attempts. Please try again in ${minutesLeft} minute(s).` 
+      });
+    }
+
+    // 3. Check if user exists AND password matches
     if (!user || !(await bcrypt.compare(password, user.password))) {
+      
+      // 🚨 IF USER EXISTS BUT PASSWORD IS WRONG -> INCREMENT ATTEMPTS
+      if (user) {
+        user.loginAttempts = (user.loginAttempts || 0) + 1;
+        let lockMessage = 'Invalid email or password. Please try again.';
+
+        // 🚨 APPLY LOCKOUT LOGIC
+        if (user.loginAttempts >= 10) {
+          // Second threshold (5 fails + 5 fails) -> Lock for 30 mins
+          user.lockUntil = Date.now() + 30 * 60 * 1000; // 30 minutes
+          user.loginAttempts = 0; // Reset counter for the next cycle
+          lockMessage = 'Too many failed attempts. Account locked for 30 minutes.';
+        } else if (user.loginAttempts >= 5) {
+          // First threshold -> Lock for 2 mins
+          user.lockUntil = Date.now() + 2 * 60 * 1000; // 2 minutes
+          lockMessage = 'Too many failed attempts. Account locked for 2 minutes.';
+        }
+
+        await user.save();
+        return res.status(401).json({ message: lockMessage });
+      }
+
+      // If user doesn't exist, just return generic error
       return res.status(401).json({ 
         message: 'Invalid email or password. Please try again.' 
       });
     }
 
-    // 3. Success - Reset any password reset backoff tracking
+    // 4. Success - Reset login attempts, lockout, and password reset backoff
+    let needsSave = false;
+    
+    if (user.loginAttempts > 0 || user.lockUntil) {
+      user.loginAttempts = 0;
+      user.lockUntil = null;
+      needsSave = true;
+    }
+    
     if (user.resetPasswordAttempts > 0) {
       user.resetPasswordLastSent = null;
       user.resetPasswordAttempts = 0;
+      needsSave = true;
+    }
+
+    if (needsSave) {
       await user.save();
     }
 
@@ -92,19 +135,11 @@ export const forgotPassword = async (req, res) => {
       return res.status(404).json({ message: 'There is no user with that email' });
     }
 
-    // ==========================================================
-    // 🚨 EXPONENTIAL BACKOFF LOGIC
-    // ==========================================================
     const now = new Date();
     const lastSent = user.resetPasswordLastSent;
     const attempts = user.resetPasswordAttempts || 0;
 
     if (lastSent) {
-      // Calculate the wait time in milliseconds.
-      // 1st retry: 1 min (60,000ms)
-      // 2nd retry: 5 min (300,000ms)
-      // 3rd retry: 10 min (600,000ms)
-      // 4th+ retry: 15 min (900,000ms)
       let waitTimeMs = 60000;
       if (attempts === 1) waitTimeMs = 5 * 60000;
       else if (attempts === 2) waitTimeMs = 10 * 60000;
@@ -122,25 +157,20 @@ export const forgotPassword = async (req, res) => {
       }
     }
 
-    // Generate a random token
     const resetToken = crypto.randomBytes(20).toString('hex');
 
-    // Hash token and set to resetPasswordToken field
     user.resetPasswordToken = crypto
       .createHash('sha256')
       .update(resetToken)
       .digest('hex');
 
-    // Set expire time (10 minutes)
     user.resetPasswordExpire = Date.now() + 10 * 60 * 1000;
     
-    // 🚨 Save the tracking data
     user.resetPasswordLastSent = now;
     user.resetPasswordAttempts = attempts + 1;
 
     await user.save();
 
-    // Point to /login?resetToken=... so the Login page can handle it
     const resetUrl = `${process.env.CLIENT_URL}/login?resetToken=${resetToken}`;
 
     const message = `
@@ -158,11 +188,10 @@ export const forgotPassword = async (req, res) => {
       });
       res.status(200).json({ message: 'Email sent successfully' });
     } catch (err) {
-      // If email fails, clear the token so they can try again without waiting
       user.resetPasswordToken = undefined;
       user.resetPasswordExpire = undefined;
-      user.resetPasswordLastSent = undefined; // Reset the cooldown
-      user.resetPasswordAttempts = Math.max(0, attempts - 1); // Undo the attempt count
+      user.resetPasswordLastSent = undefined; 
+      user.resetPasswordAttempts = Math.max(0, attempts - 1); 
       await user.save();
       
       console.error('Email sending error:', err);
@@ -176,7 +205,6 @@ export const forgotPassword = async (req, res) => {
 // 2. Reset Password using Token
 export const resetPassword = async (req, res) => {
   try {
-    // Get hashed token from URL
     const resetPasswordToken = crypto
       .createHash('sha256')
       .update(req.params.token)
@@ -184,24 +212,25 @@ export const resetPassword = async (req, res) => {
 
     const user = await User.findOne({
       resetPasswordToken,
-      resetPasswordExpire: { $gt: Date.now() }, // Check it hasn't expired
+      resetPasswordExpire: { $gt: Date.now() },
     });
 
     if (!user) {
       return res.status(400).json({ message: 'Invalid or expired token' });
     }
 
-    // Set new password
     const salt = await bcrypt.genSalt(10);
     user.password = await bcrypt.hash(req.body.password, salt);
     
-    // Clear the reset token fields
     user.resetPasswordToken = undefined;
     user.resetPasswordExpire = undefined;
     
-    // 🚨 Reset the backoff tracking on success
     user.resetPasswordLastSent = null;
     user.resetPasswordAttempts = 0;
+
+    // Also reset login attempts since they are resetting their password
+    user.loginAttempts = 0;
+    user.lockUntil = null;
     
     await user.save();
 
