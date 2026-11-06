@@ -121,7 +121,7 @@ io.on('connection', (socket) => {
     try {
       const roleFilter = socket.userRole === 'staff' 
         ? { role: 'admin' } 
-        : { role: { $in: ['customer', 'staff', 'user'] } }; // Added 'user' fallback
+        : { role: { $in: ['customer', 'staff', 'user'] } };
 
       const contacts = await User.find(roleFilter)
         .select('name email role phone')
@@ -132,8 +132,7 @@ io.on('connection', (socket) => {
           const lastMessage = await Message.findOne({ threadId: String(contact._id) })
             .sort({ createdAt: -1 }).select('createdAt text');
 
-          // 🚨 FIX: We check if senderId equals the threadId. 
-          // This perfectly counts ONLY messages sent by this specific customer, avoiding role string typos.
+          // 🚨 FIX: Accurately target unread messages from this specific contact
           const unreadCount = await Message.countDocuments({
             threadId: String(contact._id),
             senderId: String(contact._id), 
@@ -179,7 +178,6 @@ io.on('connection', (socket) => {
     try {
       if (!data || !data.senderId || !data.text) return;
 
-      // 🚨 FIX: Check if the message is coming from the customer by matching senderId to threadId
       const isFromCustomer = String(data.senderId) === String(data.threadId);
 
       const messageData = {
@@ -264,15 +262,25 @@ io.on('connection', (socket) => {
     }
   });
 
+  // 🚨 FINAL FIX: Prevent customers from marking their own messages as read
   socket.on('mark_read', async ({ threadId, userId }) => {
     try {
-      if (!threadId) return;
-      // 🚨 FIX: Explicitly target the customer's unread messages safely
-      await Message.updateMany(
-        { threadId: String(threadId), senderId: String(threadId), isRead: { $ne: true } },
+      if (!threadId || !userId) return;
+      
+      const result = await Message.updateMany(
+        { 
+          threadId: String(threadId), 
+          senderId: { $ne: String(userId) }, // <-- The magic fix: Must NOT be the person who sent it
+          isRead: { $ne: true } 
+        },
         { $set: { isRead: true } }
       );
-      console.log(`Messages marked as read - Thread: ${threadId}`);
+
+      // (Optional but good) Broadcast chat_read so other logged-in admins see the badge disappear instantly
+      if (result.modifiedCount > 0) {
+        io.emit('chat_read', { threadId: String(threadId) });
+        console.log(`Read receipts updated for thread: ${threadId} by user: ${userId}`);
+      }
     } catch (err) {
       console.error('Error marking messages as read:', err);
     }
