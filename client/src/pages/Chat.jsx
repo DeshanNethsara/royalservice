@@ -167,8 +167,9 @@ export default function Chat() {
       }
     });
 
-    // 🚨 FIXED: Load initial unread counts from backend
+    // 🚨 DEBUG: Check what backend sends
     const handleContactsList = (list) => {
+      console.log("📥 Received contacts from backend:", list);
       setContacts(list);
       
       const initialCounts = {};
@@ -177,6 +178,7 @@ export default function Chat() {
           initialCounts[contact._id] = contact.unreadCount;
         }
       });
+      console.log("🔴 Setting unread counts to:", initialCounts);
       setUnreadCounts(initialCounts);
     };
     
