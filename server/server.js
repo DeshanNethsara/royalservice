@@ -17,7 +17,7 @@ import userRoutes from './routes/userRoutes.js';
 import serviceRoutes from './routes/serviceRoutes.js';
 import bookingRoutes from './routes/bookingRoutes.js';
 
-// 🚨 NEW: Import the reminder service
+// 🚨 Import the reminder service
 import { startReminderService } from './utils/bookingReminder.js';
 
 const app = express();
@@ -41,7 +41,7 @@ const io = new Server(httpServer, {
 
 await connectDB();
 
-// 🚨 NEW: Start the cron job for 5-hour reminders
+// 🚨 Start the cron job for 5-hour reminders
 startReminderService();
 
 const corsOptions = {
@@ -179,9 +179,11 @@ io.on('connection', (socket) => {
 
       io.emit('newMessage', newMsg); 
       
+      // 🚨 FIXED: Now sending the text so the sidebar preview updates instantly
       io.emit('contact_updated', {
         threadId: String(data.threadId),
-        lastMessageAt: newMsg.createdAt
+        lastMessageAt: newMsg.createdAt,
+        lastMessageText: newMsg.text 
       });
     } catch (err) {
       console.error('ERROR SAVING MESSAGE:', err);
@@ -201,7 +203,7 @@ io.on('connection', (socket) => {
       if (!threadId) return;
       await Message.deleteMany({ threadId: String(threadId) });
       io.emit('chat_cleared', { threadId: String(threadId) });
-      io.emit('contact_updated', { threadId: String(threadId), lastMessageAt: null });
+      io.emit('contact_updated', { threadId: String(threadId), lastMessageAt: null, lastMessageText: null });
     } catch (err) {
       console.error('Error clearing chat:', err);
     }

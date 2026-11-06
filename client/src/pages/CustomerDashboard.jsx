@@ -3,7 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 import axiosClient from '../api/axiosClient';
 import toast from 'react-hot-toast';
-import { io } from 'socket.io-client';
+import ChatWidget from '../components/ChatWidget'; // 🚨 NEW: Import the widget
 
 export default function CustomerDashboard() {
   const { user, logout } = useContext(AuthContext);
@@ -14,9 +14,6 @@ export default function CustomerDashboard() {
   const [cancellingId, setCancellingId] = useState(null);
   const [downloadingId, setDownloadingId] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
-
-  // Chat Notifications State
-  const [unreadCount, setUnreadCount] = useState(0);
 
   // Pagination State
   const [currentPage, setCurrentPage] = useState(1);
@@ -36,51 +33,6 @@ export default function CustomerDashboard() {
     }
     fetchBookings();
   }, [user, navigate]);
-
-  // 🚨 UPDATED: Socket connection to match server.js perfectly
-  useEffect(() => {
-    if (!user) return;
-
-    // 1. Remove '/api' from the URL
-    const socketUrl = import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5000'; 
-    const socket = io(socketUrl, { transports: ['websocket', 'polling'] });
-
-    // 2. Unlock audio for browser security policies
-    const unlockAudio = () => {
-      const audio = new Audio('/notification.mp3');
-      audio.volume = 0;
-      audio.play().then(() => {
-        audio.pause();
-        document.removeEventListener('click', unlockAudio);
-      }).catch(() => {});
-    };
-    document.addEventListener('click', unlockAudio);
-
-    socket.on('connect', () => {
-      console.log('✅ Socket connected');
-      socket.emit('joinRoom', user._id);
-      
-      // 3. Tell the backend we are online (matches server.js logic)
-      socket.emit('user_connected', { userId: user._id, role: user.role });
-    });
-
-    // 4. Listen for 'newMessage'
-    socket.on('newMessage', (message) => {
-      console.log('📩 Received message:', message);
-      
-      // Only trigger if the sender is NOT the current user
-      if (message.senderId !== user._id) {
-        const audio = new Audio('/notification.mp3');
-        audio.play().catch(err => console.log('Audio error:', err));
-        setUnreadCount((prev) => prev + 1);
-      }
-    });
-
-    return () => {
-      socket.disconnect();
-      document.removeEventListener('click', unlockAudio);
-    };
-  }, [user]);
 
   const fetchBookings = async () => {
     try {
@@ -233,11 +185,6 @@ export default function CustomerDashboard() {
     } finally {
       setIsSubmittingRating(false);
     }
-  };
-
-  const handleChatRedirect = () => {
-    setUnreadCount(0);
-    navigate('/chat');
   };
 
   const getStatusCount = (status) => {
@@ -624,36 +571,8 @@ export default function CustomerDashboard() {
         </div>
       </main>
 
-      {/* 🚨 FLOATING CHAT BUTTON WITH FIXED BADGE DESIGN */}
-      <button
-        onClick={handleChatRedirect}
-        className="fixed bottom-6 right-6 z-40 group"
-        aria-label="Chat with our support team"
-      >
-        <span className="absolute inset-0 rounded-full bg-red-600/30 animate-ping opacity-75"></span>
-        <span className="absolute inset-0 rounded-full bg-red-600/20 animate-pulse"></span>
-
-        <span className="relative flex items-center gap-2 bg-gradient-to-br from-red-500 via-red-600 to-red-700 hover:from-red-600 hover:via-red-700 hover:to-red-800 text-white pl-3 pr-4 py-3 rounded-full shadow-2xl shadow-red-600/40 hover:shadow-red-600/60 transition-all duration-300 hover:scale-105 border border-red-500/50">
-          <span className="relative w-8 h-8 rounded-full bg-white/15 backdrop-blur-sm flex items-center justify-center flex-shrink-0 shadow-inner">
-            <svg className="w-4 h-4 text-white drop-shadow-md" fill="currentColor" viewBox="0 0 24 24">
-              <path d="M12 3C6.477 3 2 6.94 2 11.79c0 2.7 1.44 5.11 3.72 6.74-.07.83-.33 2.25-1.05 3.15-.09.12-.01.3.14.31 1.18.08 2.87-.53 4.14-1.4.96.29 2 .45 3.05.45 5.523 0 10-3.94 10-8.79S17.523 3 12 3z" />
-            </svg>
-            
-            {/* 🚨 FIXED: Clean, perfectly aligned notification badge */}
-            {unreadCount > 0 && (
-              <span className="absolute -top-2 -right-2 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-white text-red-600 text-[10px] font-black border-2 border-red-600 shadow-md px-1 z-10">
-                {unreadCount > 9 ? '9+' : unreadCount}
-              </span>
-            )}
-
-            {/* Online status dot (only shows when no unread messages) */}
-            {unreadCount === 0 && (
-              <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-400 border-2 border-red-600 shadow-sm z-10"></span>
-            )}
-          </span>
-          <span className="text-xs font-black tracking-widest uppercase whitespace-nowrap drop-shadow-sm">Chat</span>
-        </span>
-      </button>
+      {/* 🚨 NEW: Floating Chat Widget */}
+      <ChatWidget />
 
       <style dangerouslySetInnerHTML={{__html: `
         .hide-scrollbar::-webkit-scrollbar { display: none; }

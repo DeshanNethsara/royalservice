@@ -3,7 +3,8 @@ import { Link, useNavigate } from 'react-router-dom';
 import axiosClient from '../api/axiosClient';
 import { AuthContext } from '../context/AuthContext';
 import toast from 'react-hot-toast';
-import { io } from 'socket.io-client';
+// 🚨 NEW: Import Chat Widget
+import ChatWidget from '../components/ChatWidget';
 
 // ==========================================================
 // SERVICE IMAGE MAP — Pexels
@@ -55,8 +56,6 @@ export default function Homepage() {
   const [currentSlide, setCurrentSlide] = useState(0);
   const [countersVisible, setCountersVisible] = useState(false);
   
-  const [unreadCount, setUnreadCount] = useState(0);
-  
   const dropdownRef = useRef(null);
   const servicesRef = useRef(null);
   const aboutRef = useRef(null);
@@ -84,41 +83,6 @@ export default function Homepage() {
     { title: 'State-of-the-Art Facilities', description: 'Latest diagnostic and repair equipment' },
     { title: 'Warranty Guaranteed', description: 'All services backed by our comprehensive warranty' },
   ];
-
-  useEffect(() => {
-    if (!user) return;
-
-    const socketUrl = import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5000'; 
-    const socket = io(socketUrl, { transports: ['websocket', 'polling'] });
-
-    const unlockAudio = () => {
-      const audio = new Audio('/notification.mp3');
-      audio.volume = 0;
-      audio.play().then(() => {
-        audio.pause();
-        document.removeEventListener('click', unlockAudio);
-      }).catch(() => {});
-    };
-    document.addEventListener('click', unlockAudio);
-
-    socket.on('connect', () => {
-      socket.emit('joinRoom', user._id);
-      socket.emit('user_connected', { userId: user._id, role: user.role });
-    });
-
-    socket.on('newMessage', (message) => {
-      if (message.senderId !== user._id) {
-        const audio = new Audio('/notification.mp3');
-        audio.play().catch(err => console.log('Audio error:', err));
-        setUnreadCount((prev) => prev + 1);
-      }
-    });
-
-    return () => {
-      socket.disconnect();
-      document.removeEventListener('click', unlockAudio);
-    };
-  }, [user]);
 
   useEffect(() => {
     const fetchServices = async () => {
@@ -235,20 +199,6 @@ export default function Homepage() {
   const scrollToServices = () => scrollToSection(servicesRef);
   const scrollToAbout = () => scrollToSection(aboutRef);
   const scrollToContact = () => scrollToSection(contactRef);
-
-  const handleChatRedirect = () => {
-    if (!user) {
-      toast('Please sign in to chat with us', {
-        icon: '🔒',
-        style: { background: '#18181b', color: '#fff', border: '1px solid #3f3f46' },
-      });
-      navigate('/login', { state: { from: '/chat' } });
-      return;
-    }
-    
-    setUnreadCount(0); 
-    navigate('/chat');
-  };
 
   const getPrice = (service) => {
     if (service.price?.Car) return service.price.Car;
@@ -575,7 +525,7 @@ export default function Homepage() {
               </div>
               <h4 className="text-white font-bold mb-2 tracking-wide text-sm uppercase">Chat With Us</h4>
               <p className="text-zinc-400 text-xs md:text-sm leading-relaxed mb-4">Instant support from our team</p>
-              <button onClick={handleChatRedirect} className="inline-flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white px-4 md:px-5 py-2 md:py-2.5 rounded font-bold text-[10px] md:text-xs tracking-widest uppercase transition-colors">Start Chat</button>
+              <button onClick={() => user ? document.querySelector('.chat-widget-button')?.click() : toast('Please login to chat')} className="inline-flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white px-4 md:px-5 py-2 md:py-2.5 rounded font-bold text-[10px] md:text-xs tracking-widest uppercase transition-colors">Start Chat</button>
             </div>
           </div>
 
@@ -639,49 +589,9 @@ export default function Homepage() {
         </div>
       </footer>
 
-      {/* 🚨 FLOATING CHAT BUTTON WITH FIXED BADGE DESIGN */}
-      <button
-        onClick={handleChatRedirect}
-        className="fixed bottom-4 right-4 md:bottom-6 md:right-6 z-40 group"
-        aria-label="Chat with our support team"
-      >
-        {/* Pulsing effect behind the button */}
-        <span className="absolute inset-0 rounded-full bg-red-600/30 animate-ping opacity-75"></span>
-        <span className="absolute inset-0 rounded-full bg-red-600/20 animate-pulse"></span>
+      {/* 🚨 NEW: Floating Chat Widget */}
+      {user && <ChatWidget />}
 
-        {/* The actual button */}
-        <span className="relative flex items-center gap-2 bg-gradient-to-br from-red-500 via-red-600 to-red-700 hover:from-red-600 hover:via-red-700 hover:to-red-800 text-white pl-2 pr-3 md:pl-3 md:pr-4 py-2 md:py-3 rounded-full shadow-2xl shadow-red-600/40 hover:shadow-red-600/60 transition-all duration-300 hover:scale-105 border border-red-500/50">
-          
-          {/* Icon Container */}
-          <span className="relative w-7 h-7 md:w-8 md:h-8 rounded-full bg-white/15 backdrop-blur-sm flex items-center justify-center flex-shrink-0 shadow-inner">
-            <svg className="w-3.5 h-3.5 md:w-4 md:h-4 text-white drop-shadow-md" fill="currentColor" viewBox="0 0 24 24">
-              <path d="M12 3C6.477 3 2 6.94 2 11.79c0 2.7 1.44 5.11 3.72 6.74-.07.83-.33 2.25-1.05 3.15-.09.12-.01.3.14.31 1.18.08 2.87-.53 4.14-1.4.96.29 2 .45 3.05.45 5.523 0 10-3.94 10-8.79S17.523 3 12 3z" />
-            </svg>
-            
-            {/* 🚨 FIXED: Clean, perfectly aligned notification badge */}
-            {unreadCount > 0 && (
-              <span className="absolute -top-2 -right-2 flex h-[18px] min-w-[18px] md:h-5 md:min-w-[20px] items-center justify-center rounded-full bg-white text-red-600 text-[10px] md:text-[11px] font-black border-2 border-red-600 shadow-md px-1 z-10">
-                {unreadCount > 9 ? '9+' : unreadCount}
-              </span>
-            )}
-
-            {/* Online status dot (only shows when no unread messages) */}
-            {unreadCount === 0 && (
-              <span className="absolute -top-0.5 -right-0.5 w-2 h-2 md:w-2.5 md:h-2.5 rounded-full bg-emerald-400 border-2 border-red-600 shadow-sm z-10"></span>
-            )}
-          </span>
-          
-          <span className="text-[10px] md:text-xs font-black tracking-widest uppercase whitespace-nowrap drop-shadow-sm">
-            Chat
-          </span>
-        </span>
-
-        {/* Desktop Tooltip */}
-        <span className="hidden md:block absolute right-full mr-4 top-1/2 -translate-y-1/2 bg-zinc-900 text-white text-xs font-bold px-3 py-2 rounded-lg whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none shadow-xl border border-zinc-700">
-          Chat with Support
-          <span className="absolute left-full top-1/2 -translate-y-1/2 border-8 border-transparent border-l-zinc-900"></span>
-        </span>
-      </button>
     </div>
   );
 }
