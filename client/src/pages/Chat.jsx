@@ -227,6 +227,22 @@ export default function Chat() {
         socket.emit('mark_read', { threadId: newMessage.threadId, userId });
       } else if (user.role === 'admin') {
         toast.success(`New message from ${newMessage.senderName}`);
+        
+        // 🚨 UPDATE CONTACT LIST IN REAL-TIME FOR ADMIN
+        setContacts(prev => {
+          const updated = prev.map(c => 
+            String(c._id) === String(newMessage.threadId) 
+              ? { ...c, lastMessageText: newMessage.text, lastMessageAt: newMessage.createdAt } 
+              : c
+          );
+          return updated.sort((a, b) => {
+            if (a.lastMessageAt && b.lastMessageAt) return new Date(b.lastMessageAt) - new Date(a.lastMessageAt);
+            if (a.lastMessageAt) return -1;
+            if (b.lastMessageAt) return 1;
+            return a.name.localeCompare(b.name);
+          });
+        });
+
         setUnreadCounts(prev => ({ ...prev, [newMessage.threadId]: (prev[newMessage.threadId] || 0) + 1 }));
       }
     };
@@ -328,8 +344,6 @@ export default function Chat() {
       text: message.trim()
     };
 
-    // Emit the message. The backend will save it and emit back to us, 
-    // where the `handleIncomingMessage` listener will instantly display it.
     socket.emit('send_message', messageData);
     setMessage('');
     socket.emit('stop_typing', { threadId: activeContact._id, userId });
@@ -455,37 +469,56 @@ export default function Chat() {
               {contacts.length === 0 ? (
                 <div className="text-center py-8 text-zinc-600 text-sm">No contacts online</div>
               ) : (
-                contacts.map((contact) => (
-                  <div
-                    key={contact._id}
-                    onClick={() => {
-                      setActiveContact(contact);
-                      setIsMobileChatOpen(true);
-                    }}
-                    onContextMenu={(e) => handleContextMenu(e, contact)}
-                    className={`p-3 rounded-xl cursor-pointer transition-all border relative ${
-                      activeContact?._id === contact._id ? 'bg-red-600/10 border-red-600/40' : 'bg-zinc-950/60 border-zinc-800 hover:bg-zinc-800/50'
-                    }`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="relative">
-                        <div className="w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center shrink-0">
-                          <span className="text-xs font-bold text-zinc-400">{contact.name?.charAt(0)?.toUpperCase()}</span>
+                contacts.map((contact) => {
+                  const hasUnread = unreadCounts[contact._id] > 0;
+                  
+                  return (
+                    <div
+                      key={contact._id}
+                      onClick={() => {
+                        setActiveContact(contact);
+                        setIsMobileChatOpen(true);
+                      }}
+                      onContextMenu={(e) => handleContextMenu(e, contact)}
+                      className={`p-3 rounded-xl cursor-pointer transition-all border relative ${
+                        activeContact?._id === contact._id ? 'bg-red-600/10 border-red-600/40' : 'bg-zinc-950/60 border-zinc-800 hover:bg-zinc-800/50'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="relative">
+                          <div className="w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center shrink-0">
+                            <span className="text-xs font-bold text-zinc-400">{contact.name?.charAt(0)?.toUpperCase()}</span>
+                          </div>
+                          {contact.isOnline && <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-500 rounded-full border-2 border-zinc-900"></span>}
                         </div>
-                        {contact.isOnline && <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-500 rounded-full border-2 border-zinc-900"></span>}
+                        
+                        <div className="flex-1 min-w-0">
+                          {/* 🚨 Highlight name in white if unread, otherwise grey */}
+                          <p className={`font-bold text-sm truncate ${hasUnread ? 'text-white' : 'text-zinc-300'}`}>
+                            {contact.name}
+                          </p>
+                          
+                          {/* 🚨 Message Preview */}
+                          {contact.lastMessageText ? (
+                            <p className={`text-xs truncate max-w-[150px] ${hasUnread ? 'text-red-400 font-medium' : 'text-zinc-500'}`}>
+                              {contact.lastMessageText}
+                            </p>
+                          ) : (
+                            <span className={`text-[9px] font-black uppercase tracking-widest mt-1 inline-block px-2 py-0.5 rounded border ${contact.role === 'staff' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' : 'bg-zinc-800 text-zinc-400 border-zinc-700'}`}>
+                              {contact.role}
+                            </span>
+                          )}
+                        </div>
+                        
+                        {hasUnread && (
+                          <span className="bg-red-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0">
+                            {unreadCounts[contact._id]}
+                          </span>
+                        )}
                       </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="font-bold text-sm text-white truncate">{contact.name}</p>
-                        <span className={`text-[9px] font-black uppercase tracking-widest mt-1 inline-block px-2 py-0.5 rounded border ${contact.role === 'staff' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' : 'bg-zinc-800 text-zinc-400 border-zinc-700'}`}>
-                          {contact.role}
-                        </span>
-                      </div>
-                      {unreadCounts[contact._id] > 0 && (
-                        <span className="bg-red-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">{unreadCounts[contact._id]}</span>
-                      )}
                     </div>
-                  </div>
-                ))
+                  );
+                })
               )}
             </div>
           </aside>

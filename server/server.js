@@ -71,7 +71,7 @@ const onlineUsers = new Map();
 io.on('connection', (socket) => {
   console.log(`User connected to Comms-Link: ${socket.id}`);
 
-  // 🚨 FIX 1: Handle the 'joinRoom' event from the frontend
+  // Handle the 'joinRoom' event from the frontend
   socket.on('joinRoom', (userId) => {
     socket.join(userId);
     console.log(`Socket ${socket.id} joined room ${userId}`);
@@ -116,13 +116,16 @@ io.on('connection', (socket) => {
 
       const contactsWithLastMessage = await Promise.all(
         contacts.map(async (contact) => {
+          // 🚨 FIX: Added 'text' to the select query
           const lastMessage = await Message.findOne({ threadId: String(contact._id) })
-            .sort({ createdAt: -1 }).select('createdAt');
+            .sort({ createdAt: -1 }).select('createdAt text');
 
           return {
             ...contact.toObject(),
             isOnline: onlineUsers.has(contact._id.toString()),
-            lastMessageAt: lastMessage ? lastMessage.createdAt : null
+            lastMessageAt: lastMessage ? lastMessage.createdAt : null,
+            // 🚨 FIX: Send the text to the frontend so the sidebar can show a preview
+            lastMessageText: lastMessage ? lastMessage.text : null 
           };
         })
       );
@@ -168,7 +171,6 @@ io.on('connection', (socket) => {
 
       console.log(`Message saved: ${newMsg.senderName} - ${newMsg.senderRole}`);
 
-      // 🚨 FIX 2: Emit as 'newMessage' to match the frontend listener
       io.emit('newMessage', newMsg); 
       
       io.emit('contact_updated', {
