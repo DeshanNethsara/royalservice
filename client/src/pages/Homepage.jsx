@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import axiosClient from '../api/axiosClient';
 import { AuthContext } from '../context/AuthContext';
 import toast from 'react-hot-toast';
-// 🚨 NEW: Import Chat Widget
+// 🚨 Import Chat Widget
 import ChatWidget from '../components/ChatWidget';
 
 // ==========================================================
@@ -589,8 +589,8 @@ export default function Homepage() {
         </div>
       </footer>
 
-      {/* 🚨 NEW: Floating Chat Widget */}
-      {user && <ChatWidget />}
+      {/* 🚨 FIX: Always render the widget. Do not use {user && ...} */}
+      <ChatWidget />
 
     </div>
   );
