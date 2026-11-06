@@ -47,7 +47,6 @@ export default function Chat() {
     { id: 'status', label: '📊 Booking Status', question: 'How can I check my booking status?' }
   ];
 
-  // Fetch Real Booking Status
   const fetchRealBookingStatus = async () => {
     try {
       const response = await axiosClient.get('/bookings/my-bookings');
@@ -69,7 +68,6 @@ export default function Chat() {
     }
   };
 
-  // Fetch Real Pricing
   const fetchRealPricing = async () => {
     try {
       const response = await axiosClient.get('/services');
@@ -218,8 +216,12 @@ export default function Chat() {
         hasSentFirstMessageRef.current = (history || []).some(m => String(m.senderId) === String(userId) && m.senderRole !== 'bot');
       }
     };
-    const handleReceiveMessage = (newMessage) => {
+    
+    // 🚨 FIX: Combine listeners to catch both 'receive_message' and 'newMessage'
+    const handleIncomingMessage = (newMessage) => {
+      // For customers, only process messages for their own thread
       if (user.role !== 'admin' && String(newMessage.threadId) !== String(userId)) return;
+      
       if (String(newMessage.threadId) === String(activeThreadRef.current)) {
         addMessageIfNew(newMessage);
         socket.emit('mark_read', { threadId: newMessage.threadId, userId });
@@ -228,6 +230,7 @@ export default function Chat() {
         setUnreadCounts(prev => ({ ...prev, [newMessage.threadId]: (prev[newMessage.threadId] || 0) + 1 }));
       }
     };
+
     const handleChatCleared = ({ threadId }) => {
       if (String(threadId) === String(activeThreadRef.current)) {
         setMessages([]);
@@ -262,7 +265,11 @@ export default function Chat() {
     socket.on('user_offline', handleUserOffline);
     socket.on('contact_updated', handleContactUpdated);
     socket.on('chat_history', handleChatHistory);
-    socket.on('receive_message', handleReceiveMessage);
+    
+    // 🚨 Listen to both possible backend event names
+    socket.on('receive_message', handleIncomingMessage);
+    socket.on('newMessage', handleIncomingMessage); 
+
     socket.on('chat_cleared', handleChatCleared);
     socket.on('chat_deleted', handleChatDeleted);
     socket.on('typing', handleTyping);
@@ -274,7 +281,8 @@ export default function Chat() {
       socket.off('user_offline', handleUserOffline);
       socket.off('contact_updated', handleContactUpdated);
       socket.off('chat_history', handleChatHistory);
-      socket.off('receive_message', handleReceiveMessage);
+      socket.off('receive_message', handleIncomingMessage);
+      socket.off('newMessage', handleIncomingMessage);
       socket.off('chat_cleared', handleChatCleared);
       socket.off('chat_deleted', handleChatDeleted);
       socket.off('typing', handleTyping);
@@ -320,6 +328,8 @@ export default function Chat() {
       text: message.trim()
     };
 
+    // Emit the message. The backend will save it and emit back to us, 
+    // where the `handleIncomingMessage` listener will instantly display it.
     socket.emit('send_message', messageData);
     setMessage('');
     socket.emit('stop_typing', { threadId: activeContact._id, userId });
@@ -383,10 +393,8 @@ export default function Chat() {
   return (
     <div className="h-[100dvh] bg-zinc-950 flex flex-col font-sans text-zinc-50 selection:bg-red-600 selection:text-white relative overflow-hidden">
       
-      {/* Ambient red glow */}
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-2xl h-[400px] bg-red-600/5 blur-[120px] rounded-full pointer-events-none"></div>
 
-      {/* Context Menu */}
       {contextMenu && (
         <div
           className="fixed z-50 bg-zinc-900 border border-zinc-800 rounded-lg shadow-2xl py-2 min-w-[200px]"
@@ -409,7 +417,6 @@ export default function Chat() {
         </div>
       )}
 
-      {/* Header */}
       <header className="relative z-10 bg-zinc-950/80 backdrop-blur-xl border-b border-zinc-800 py-3 px-4 md:px-6 flex items-center justify-between shadow-2xl shrink-0">
         <div className="flex items-center gap-3 md:gap-4">
           <button
@@ -422,7 +429,6 @@ export default function Chat() {
             </svg>
           </button>
           <div className="flex flex-col">
-            {/* 🚨 RENAMED HEADER HERE */}
             <h2 className="text-base md:text-lg font-black tracking-widest uppercase text-white">Support Center</h2>
             <span className="text-[9px] md:text-[10px] text-emerald-400 font-bold uppercase tracking-widest flex items-center gap-1">
               <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></span> 
@@ -438,10 +444,8 @@ export default function Chat() {
         </div>
       </header>
 
-      {/* Main layout */}
       <main className="flex-1 relative z-10 max-w-6xl mx-auto w-full p-2 md:p-6 flex flex-col md:flex-row gap-4 md:gap-6 min-h-0 overflow-hidden">
 
-        {/* ADMIN SIDEBAR / CONTACT LIST */}
         {user?.role === 'admin' && (
           <aside className={`w-full md:w-72 lg:w-80 bg-zinc-900 border border-zinc-800 rounded-2xl flex-col overflow-hidden shrink-0 shadow-2xl min-h-0 ${isMobileChatOpen ? 'hidden md:flex' : 'flex'}`}>
             <div className="p-4 border-b border-zinc-800 bg-zinc-950/50 shrink-0">
@@ -487,10 +491,8 @@ export default function Chat() {
           </aside>
         )}
 
-        {/* Messaging Area */}
         <section className={`flex-1 min-w-0 min-h-0 bg-zinc-900 border border-zinc-800 rounded-2xl flex-col overflow-hidden shadow-2xl relative ${user?.role === 'admin' && !isMobileChatOpen ? 'hidden md:flex' : 'flex'}`}>
 
-          {/* Chat Header */}
           {activeContact && (
             <div className="p-3 md:p-4 border-b border-zinc-800 bg-zinc-950/50 flex justify-between items-center shrink-0">
               <div className="flex items-center gap-3">
@@ -529,7 +531,6 @@ export default function Chat() {
             </div>
           )}
 
-          {/* Messages */}
           <div ref={messagesContainerRef} className="flex-1 min-h-0 p-4 md:p-6 overflow-y-auto space-y-4 md:space-y-6">
             {!activeContact ? (
               <div className="h-full flex items-center justify-center text-zinc-500 text-sm font-medium text-center px-4">
@@ -566,7 +567,6 @@ export default function Chat() {
             <div ref={messagesEndRef} />
           </div>
 
-          {/* Quick Commands (Only for Customer) */}
           {user?.role !== 'admin' && (
             <div className="px-3 md:px-4 pb-2 bg-zinc-950/40 shrink-0">
               <div className="flex gap-2 overflow-x-auto py-2 hide-scrollbar">
@@ -583,7 +583,6 @@ export default function Chat() {
             </div>
           )}
 
-          {/* Message Input */}
           <div className="p-3 md:p-4 bg-zinc-950/50 border-t border-zinc-800 backdrop-blur-xl shrink-0">
             <form onSubmit={handleSendMessage} className="flex gap-2 md:gap-3">
               <input
@@ -615,7 +614,6 @@ export default function Chat() {
         </section>
       </main>
       
-      {/* Hide scrollbar utility for quick commands */}
       <style dangerouslySetInnerHTML={{__html: `
         .hide-scrollbar::-webkit-scrollbar { display: none; }
         .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }

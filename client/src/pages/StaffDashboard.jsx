@@ -383,7 +383,7 @@ export default function StaffDashboard() {
         )}
       </div>
 
-      {/* 🚨 FLOATING CHAT BUTTON WITH NOTIFICATION BADGE */}
+      {/* 🚨 FLOATING CHAT BUTTON WITH FIXED BADGE DESIGN */}
       <button
         onClick={handleChatRedirect}
         className={`fixed bottom-6 right-6 z-40 group ${isMobileDetailOpen ? 'hidden md:block' : 'block'}`}
@@ -392,25 +392,25 @@ export default function StaffDashboard() {
         <span className="absolute inset-0 rounded-full bg-red-600/30 animate-ping opacity-75"></span>
         <span className="absolute inset-0 rounded-full bg-red-600/20 animate-pulse"></span>
 
-        <span className="relative flex items-center gap-2 bg-gradient-to-br from-red-500 via-red-600 to-red-700 hover:from-red-600 hover:via-red-700 hover:to-red-800 text-white pl-3 pr-4 py-3 rounded-full shadow-2xl shadow-red-600/40 hover:shadow-red-600/60 transition-all duration-300 hover:scale-105">
-          <span className="relative w-8 h-8 rounded-full bg-white/15 backdrop-blur-sm flex items-center justify-center flex-shrink-0">
-            <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 24 24">
+        <span className="relative flex items-center gap-2 bg-gradient-to-br from-red-500 via-red-600 to-red-700 hover:from-red-600 hover:via-red-700 hover:to-red-800 text-white pl-3 pr-4 py-3 rounded-full shadow-2xl shadow-red-600/40 hover:shadow-red-600/60 transition-all duration-300 hover:scale-105 border border-red-500/50">
+          <span className="relative w-8 h-8 rounded-full bg-white/15 backdrop-blur-sm flex items-center justify-center flex-shrink-0 shadow-inner">
+            <svg className="w-4 h-4 text-white drop-shadow-md" fill="currentColor" viewBox="0 0 24 24">
               <path d="M12 3C6.477 3 2 6.94 2 11.79c0 2.7 1.44 5.11 3.72 6.74-.07.83-.33 2.25-1.05 3.15-.09.12-.01.3.14.31 1.18.08 2.87-.53 4.14-1.4.96.29 2 .45 3.05.45 5.523 0 10-3.94 10-8.79S17.523 3 12 3z" />
             </svg>
             
-            {/* Notification Badge */}
+            {/* 🚨 FIXED: Clean, perfectly aligned notification badge */}
             {unreadCount > 0 && (
-              <span className="absolute -top-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white border-2 border-zinc-900 animate-bounce shadow-lg">
+              <span className="absolute -top-2 -right-2 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-white text-red-600 text-[10px] font-black border-2 border-red-600 shadow-md px-1 z-10">
                 {unreadCount > 9 ? '9+' : unreadCount}
               </span>
             )}
 
-            {/* Show online dot only if no unread messages */}
+            {/* Online status dot (only shows when no unread messages) */}
             {unreadCount === 0 && (
-              <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-400 border-2 border-red-600"></span>
+              <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-400 border-2 border-red-600 shadow-sm z-10"></span>
             )}
           </span>
-          <span className="text-xs font-black tracking-widest uppercase whitespace-nowrap">
+          <span className="text-xs font-black tracking-widest uppercase whitespace-nowrap drop-shadow-sm">
             Chat
           </span>
         </span>

@@ -85,14 +85,12 @@ export default function Homepage() {
     { title: 'Warranty Guaranteed', description: 'All services backed by our comprehensive warranty' },
   ];
 
-  // 🚨 UPDATED: Socket connection to match your server.js
   useEffect(() => {
     if (!user) return;
 
     const socketUrl = import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5000'; 
     const socket = io(socketUrl, { transports: ['websocket', 'polling'] });
 
-    // Unlock audio for browser security policies
     const unlockAudio = () => {
       const audio = new Audio('/notification.mp3');
       audio.volume = 0;
@@ -104,18 +102,11 @@ export default function Homepage() {
     document.addEventListener('click', unlockAudio);
 
     socket.on('connect', () => {
-      console.log('✅ Socket connected');
-      // Join the user's room
       socket.emit('joinRoom', user._id);
-      // Notify backend that this user is online (needed for your server.js logic)
       socket.emit('user_connected', { userId: user._id, role: user.role });
     });
 
-    // 🚨 Listen for the correct event name
     socket.on('newMessage', (message) => {
-      console.log('📩 Received message:', message);
-      
-      // Only play sound and show badge if message is from someone else
       if (message.senderId !== user._id) {
         const audio = new Audio('/notification.mp3');
         audio.play().catch(err => console.log('Audio error:', err));
@@ -255,7 +246,7 @@ export default function Homepage() {
       return;
     }
     
-    setUnreadCount(0); // Clear badge
+    setUnreadCount(0); 
     navigate('/chat');
   };
 
@@ -648,37 +639,45 @@ export default function Homepage() {
         </div>
       </footer>
 
-      {/* FLOATING CHAT BUTTON WITH NOTIFICATION BADGE */}
+      {/* 🚨 FLOATING CHAT BUTTON WITH FIXED BADGE DESIGN */}
       <button
         onClick={handleChatRedirect}
         className="fixed bottom-4 right-4 md:bottom-6 md:right-6 z-40 group"
         aria-label="Chat with our support team"
       >
+        {/* Pulsing effect behind the button */}
         <span className="absolute inset-0 rounded-full bg-red-600/30 animate-ping opacity-75"></span>
         <span className="absolute inset-0 rounded-full bg-red-600/20 animate-pulse"></span>
 
-        <span className="relative flex items-center gap-2 bg-gradient-to-br from-red-500 via-red-600 to-red-700 hover:from-red-600 hover:via-red-700 hover:to-red-800 text-white pl-2 pr-3 md:pl-3 md:pr-4 py-2 md:py-3 rounded-full shadow-2xl shadow-red-600/40 hover:shadow-red-600/60 transition-all duration-300 hover:scale-105">
-          <span className="relative w-7 h-7 md:w-8 md:h-8 rounded-full bg-white/15 backdrop-blur-sm flex items-center justify-center flex-shrink-0">
-            <svg className="w-3 h-3 md:w-4 md:h-4 text-white" fill="currentColor" viewBox="0 0 24 24">
+        {/* The actual button */}
+        <span className="relative flex items-center gap-2 bg-gradient-to-br from-red-500 via-red-600 to-red-700 hover:from-red-600 hover:via-red-700 hover:to-red-800 text-white pl-2 pr-3 md:pl-3 md:pr-4 py-2 md:py-3 rounded-full shadow-2xl shadow-red-600/40 hover:shadow-red-600/60 transition-all duration-300 hover:scale-105 border border-red-500/50">
+          
+          {/* Icon Container */}
+          <span className="relative w-7 h-7 md:w-8 md:h-8 rounded-full bg-white/15 backdrop-blur-sm flex items-center justify-center flex-shrink-0 shadow-inner">
+            <svg className="w-3.5 h-3.5 md:w-4 md:h-4 text-white drop-shadow-md" fill="currentColor" viewBox="0 0 24 24">
               <path d="M12 3C6.477 3 2 6.94 2 11.79c0 2.7 1.44 5.11 3.72 6.74-.07.83-.33 2.25-1.05 3.15-.09.12-.01.3.14.31 1.18.08 2.87-.53 4.14-1.4.96.29 2 .45 3.05.45 5.523 0 10-3.94 10-8.79S17.523 3 12 3z" />
             </svg>
             
-            {/* Notification Badge */}
+            {/* 🚨 FIXED: Clean, perfectly aligned notification badge */}
             {unreadCount > 0 && (
-              <span className="absolute -top-1.5 -right-1.5 md:-top-2 md:-right-2 flex h-4 w-4 md:h-5 md:w-5 items-center justify-center rounded-full bg-red-500 text-[9px] md:text-[10px] font-bold text-white border-2 border-zinc-900 animate-bounce shadow-lg">
+              <span className="absolute -top-2 -right-2 flex h-[18px] min-w-[18px] md:h-5 md:min-w-[20px] items-center justify-center rounded-full bg-white text-red-600 text-[10px] md:text-[11px] font-black border-2 border-red-600 shadow-md px-1 z-10">
                 {unreadCount > 9 ? '9+' : unreadCount}
               </span>
             )}
 
-            {/* Online status dot */}
+            {/* Online status dot (only shows when no unread messages) */}
             {unreadCount === 0 && (
-              <span className="absolute -top-0.5 -right-0.5 w-2 h-2 md:w-2.5 md:h-2.5 rounded-full bg-emerald-400 border md:border-2 border-red-600"></span>
+              <span className="absolute -top-0.5 -right-0.5 w-2 h-2 md:w-2.5 md:h-2.5 rounded-full bg-emerald-400 border-2 border-red-600 shadow-sm z-10"></span>
             )}
           </span>
-          <span className="text-[10px] md:text-xs font-black tracking-widest uppercase whitespace-nowrap">Chat</span>
+          
+          <span className="text-[10px] md:text-xs font-black tracking-widest uppercase whitespace-nowrap drop-shadow-sm">
+            Chat
+          </span>
         </span>
 
-        <span className="hidden md:block absolute right-full mr-4 top-1/2 -translate-y-1/2 bg-zinc-900 text-white text-xs font-bold px-3 py-2 rounded-lg whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none shadow-xl">
+        {/* Desktop Tooltip */}
+        <span className="hidden md:block absolute right-full mr-4 top-1/2 -translate-y-1/2 bg-zinc-900 text-white text-xs font-bold px-3 py-2 rounded-lg whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none shadow-xl border border-zinc-700">
           Chat with Support
           <span className="absolute left-full top-1/2 -translate-y-1/2 border-8 border-transparent border-l-zinc-900"></span>
         </span>
