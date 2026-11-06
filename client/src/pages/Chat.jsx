@@ -231,12 +231,8 @@ export default function Chat() {
     const handleIncomingMessage = (newMessage) => {
       if (user.role !== 'admin' && String(newMessage.threadId) !== String(userId)) return;
       
-      if (String(newMessage.threadId) === String(activeThreadRef.current)) {
-        addMessageIfNew(newMessage);
-        socket.emit('mark_read', { threadId: newMessage.threadId, userId });
-      } else if (user.role === 'admin') {
-        toast.success(`New message from ${newMessage.senderName}`);
-        
+      // 🚨 FIX: ALWAYS update the left-side contacts preview for Admins
+      if (user.role === 'admin') {
         setContacts(prev => {
           const updated = prev.map(c => 
             String(c._id) === String(newMessage.threadId) 
@@ -250,7 +246,14 @@ export default function Chat() {
             return a.name.localeCompare(b.name);
           });
         });
+      }
 
+      // Handle the main chat window and unread badge logic
+      if (String(newMessage.threadId) === String(activeThreadRef.current)) {
+        addMessageIfNew(newMessage);
+        socket.emit('mark_read', { threadId: newMessage.threadId, userId });
+      } else if (user.role === 'admin') {
+        toast.success(`New message from ${newMessage.senderName}`);
         setUnreadCounts(prev => ({ ...prev, [newMessage.threadId]: (prev[newMessage.threadId] || 0) + 1 }));
       }
     };
@@ -374,15 +377,34 @@ export default function Chat() {
     if (!message.trim() || !activeContact || !user) return;
 
     const userId = getUserId();
+    const messageText = message.trim();
     const messageData = {
       senderId: userId,
       senderName: user.name,
       senderRole: user.role,
       threadId: activeContact._id,
-      text: message.trim()
+      text: messageText
     };
 
     socket.emit('send_message', messageData);
+
+    // 🚨 FIX: Instantly update the left sidebar preview with the outgoing message
+    if (user.role === 'admin') {
+      setContacts(prev => {
+        const updated = prev.map(c => 
+          String(c._id) === String(activeContact._id) 
+            ? { ...c, lastMessageText: messageText, lastMessageAt: new Date().toISOString() } 
+            : c
+        );
+        return updated.sort((a, b) => {
+          if (a.lastMessageAt && b.lastMessageAt) return new Date(b.lastMessageAt) - new Date(a.lastMessageAt);
+          if (a.lastMessageAt) return -1;
+          if (b.lastMessageAt) return 1;
+          return a.name.localeCompare(b.name);
+        });
+      });
+    }
+
     setMessage('');
     socket.emit('stop_typing', { threadId: activeContact._id, userId });
 
