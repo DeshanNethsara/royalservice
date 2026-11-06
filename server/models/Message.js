@@ -27,6 +27,12 @@ const messageSchema = new mongoose.Schema(
     text: {
       type: String,
       required: true
+    },
+
+    // 🚨 NEW: Track if the message has been read by the admin
+    isRead: {
+      type: Boolean,
+      default: false
     }
   },
   {

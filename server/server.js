@@ -117,7 +117,6 @@ io.on('connection', (socket) => {
         ? { role: 'admin' } 
         : { role: { $in: ['customer', 'staff'] } };
 
-      // 🚨 FIX: Added 'phone' to the select query
       const contacts = await User.find(roleFilter)
         .select('name email role phone')
         .sort({ role: 1, name: 1 });
@@ -127,11 +126,19 @@ io.on('connection', (socket) => {
           const lastMessage = await Message.findOne({ threadId: String(contact._id) })
             .sort({ createdAt: -1 }).select('createdAt text');
 
+          // 🚨 FIX: Count unread messages sent by the customer
+          const unreadCount = await Message.countDocuments({
+            threadId: String(contact._id),
+            senderRole: 'customer',
+            isRead: false
+          });
+
           return {
             ...contact.toObject(),
             isOnline: onlineUsers.has(contact._id.toString()),
             lastMessageAt: lastMessage ? lastMessage.createdAt : null,
-            lastMessageText: lastMessage ? lastMessage.text : null 
+            lastMessageText: lastMessage ? lastMessage.text : null,
+            unreadCount // 🚨 Send this to frontend
           };
         })
       );
@@ -170,7 +177,9 @@ io.on('connection', (socket) => {
         senderName: data.senderName,
         senderRole: data.senderRole,
         threadId: String(data.threadId),
-        text: data.text.trim()
+        text: data.text.trim(),
+        // 🚨 FIX: Default to unread (false) for new customer messages
+        isRead: data.senderRole !== 'customer' 
       };
 
       const newMsg = await Message.create(messageData);
@@ -247,8 +256,18 @@ io.on('connection', (socket) => {
     }
   });
 
-  socket.on('mark_read', ({ threadId, userId }) => {
-    console.log(`Messages marked as read - Thread: ${threadId}, User: ${userId}`);
+  // 🚨 FIX: Actually update the database when messages are read
+  socket.on('mark_read', async ({ threadId, userId }) => {
+    try {
+      if (!threadId) return;
+      await Message.updateMany(
+        { threadId: String(threadId), senderRole: 'customer', isRead: false },
+        { $set: { isRead: true } }
+      );
+      console.log(`Messages marked as read - Thread: ${threadId}`);
+    } catch (err) {
+      console.error('Error marking messages as read:', err);
+    }
   });
 
   socket.on('disconnect', () => {

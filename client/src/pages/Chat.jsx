@@ -167,7 +167,17 @@ export default function Chat() {
       }
     });
 
-    const handleContactsList = (list) => setContacts(list);
+    // 🚨 FIX: Load initial unread counts from backend
+    const handleContactsList = (list) => {
+      setContacts(list);
+      const initialCounts = {};
+      list.forEach(contact => {
+        if (contact.unreadCount > 0) {
+          initialCounts[contact._id] = contact.unreadCount;
+        }
+      });
+      setUnreadCounts(initialCounts);
+    };
     
     const handleUserOnline = (newUser) => {
       setContacts(prev => {
@@ -279,6 +289,7 @@ export default function Chat() {
     const handleAllChatsCleared = () => {
       setMessages([]);
       setContacts(prev => prev.map(c => ({ ...c, lastMessageText: null, lastMessageAt: null })));
+      setUnreadCounts({}); // 🚨 Clear all unread counts
       toast.success('All chats have been cleared');
     };
 
@@ -323,6 +334,7 @@ export default function Chat() {
     if (!activeContact || !user) return;
     activeThreadRef.current = activeContact._id;
     socket.emit('fetch_history', activeContact._id);
+    // 🚨 FIX: Mark as read (which updates DB and clears local state)
     socket.emit('mark_read', { threadId: activeContact._id, userId: getUserId() });
     setUnreadCounts(prev => {
       const updated = { ...prev };
@@ -494,7 +506,6 @@ export default function Chat() {
               </button>
             </div>
 
-            {/* 🚨 FIXED: flex-1 and min-h-0 to force scroll */}
             <div className="flex-1 min-h-0 overflow-y-auto p-3 space-y-2">
               {contacts.length === 0 ? (
                 <div className="text-center py-8 text-zinc-600 text-sm">No contacts online</div>
@@ -584,7 +595,6 @@ export default function Chat() {
               </div>
 
               <div className="flex items-center gap-3">
-                {/* 🚨 Phone number placed on the right side */}
                 {user?.role === 'admin' && activeContact.phone && (
                   <span className="text-xs text-zinc-400 font-medium hidden sm:block">
                     {activeContact.phone}
@@ -678,7 +688,7 @@ export default function Chat() {
               >
                 <span className="hidden sm:inline mr-2">SEND</span>
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 19l9 2-9-18-9 18-9-2 9-18 9 18-9-2z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
                 </svg>
               </button>
             </form>
