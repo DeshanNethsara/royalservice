@@ -330,21 +330,25 @@ export default function Chat() {
     };
   }, [user, navigate, getUserId, addMessageIfNew]);
 
-  useEffect(() => {
-    if (!activeContact || !user) return;
-    activeThreadRef.current = activeContact._id;
-    socket.emit('fetch_history', activeContact._id);
+  // 🚨 NEW: This only runs when you explicitly click a contact
+  const handleOpenChat = (contact) => {
+    setActiveContact(contact);
+    activeThreadRef.current = contact._id;
     
-    // 🚨 FIX: Only mark as read if this contact has unread messages
-    if (unreadCounts[activeContact._id] > 0) {
-      socket.emit('mark_read', { threadId: activeContact._id, userId: getUserId() });
+    socket.emit('fetch_history', contact._id);
+    
+    // Only clear badge if there are unread messages
+    if (unreadCounts[contact._id] > 0) {
+      socket.emit('mark_read', { threadId: contact._id, userId: getUserId() });
       setUnreadCounts(prev => {
         const updated = { ...prev };
-        delete updated[activeContact._id];
+        delete updated[contact._id];
         return updated;
       });
     }
-  }, [activeContact, user, getUserId, unreadCounts]);
+
+    setIsMobileChatOpen(true);
+  };
 
   useEffect(() => {
     const container = messagesContainerRef.current;
@@ -519,10 +523,7 @@ export default function Chat() {
                   return (
                     <div
                       key={contact._id}
-                      onClick={() => {
-                        setActiveContact(contact);
-                        setIsMobileChatOpen(true);
-                      }}
+                      onClick={() => handleOpenChat(contact)} // 🚨 USE handleOpenChat
                       onContextMenu={(e) => handleContextMenu(e, contact)}
                       className={`p-3 rounded-xl cursor-pointer transition-all border relative ${
                         activeContact?._id === contact._id ? 'bg-red-600/10 border-red-600/40' : 'bg-zinc-950/60 border-zinc-800 hover:bg-zinc-800/50'
