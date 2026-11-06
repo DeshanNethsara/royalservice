@@ -479,10 +479,10 @@ export default function Chat() {
         </div>
       </header>
 
-      <main className="flex-1 relative z-10 max-w-6xl mx-auto w-full p-2 md:p-6 flex flex-col md:flex-row gap-4 md:gap-6 min-h-0 overflow-hidden">
+      <main className="flex-1 relative z-10 max-w-6xl mx-auto w-full p-2 md:p-6 flex flex-col md:flex-row gap-4 md:gap-6 min-h-0 h-full overflow-hidden">
 
         {user?.role === 'admin' && (
-          <aside className={`w-full md:w-72 lg:w-80 bg-zinc-900 border border-zinc-800 rounded-2xl flex-col overflow-hidden shrink-0 shadow-2xl min-h-0 ${isMobileChatOpen ? 'hidden md:flex' : 'flex'}`}>
+          <aside className={`w-full md:w-72 lg:w-80 bg-zinc-900 border border-zinc-800 rounded-2xl flex flex-col shrink-0 shadow-2xl overflow-hidden h-full ${isMobileChatOpen ? 'hidden md:flex' : 'flex'}`}>
             
             <div className="p-4 border-b border-zinc-800 bg-zinc-950/50 shrink-0 flex justify-between items-center">
               <h3 className="text-xs font-bold text-zinc-500 uppercase tracking-widest">Active Personnel</h3>
@@ -494,6 +494,7 @@ export default function Chat() {
               </button>
             </div>
 
+            {/* 🚨 FIXED: flex-1 and min-h-0 to force scroll */}
             <div className="flex-1 min-h-0 overflow-y-auto p-3 space-y-2">
               {contacts.length === 0 ? (
                 <div className="text-center py-8 text-zinc-600 text-sm">No contacts online</div>
@@ -571,33 +572,34 @@ export default function Chat() {
                 <div className="w-8 h-8 rounded-full bg-red-600/20 border border-red-500/30 flex items-center justify-center">
                   <span className="text-xs font-bold text-red-500">{activeContact.name?.charAt(0)?.toUpperCase() || 'B'}</span>
                 </div>
+                
                 <div>
                   <span className="font-bold text-white text-sm">{user?.role === 'admin' ? activeContact.name : 'Royal Service Center'}</span>
-                  
-                  {/* 🚨 NEW: Show phone number and status */}
-                  <div className="flex items-center gap-2 text-[10px] text-zinc-500 mt-0.5">
-                    {user?.role === 'admin' && activeContact.phone && (
-                      <span>{activeContact.phone}</span>
-                    )}
-                    {user?.role === 'admin' && activeContact.phone && <span>•</span>}
-                    
-                    <span>
-                      {isTyping 
-                        ? `${typingUser} is typing...` 
-                        : (user?.role === 'admin' ? (activeContact.isOnline ? 'online' : 'offline') : 'online')}
-                    </span>
-                  </div>
-
+                  <p className="text-[10px] text-zinc-500">
+                    {isTyping 
+                      ? `${typingUser} is typing...` 
+                      : (user?.role === 'admin' ? (activeContact.isOnline ? 'online' : 'offline') : 'online')}
+                  </p>
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={handleClearChat}
-                className="px-3 py-2 rounded-lg text-[10px] md:text-xs font-bold uppercase tracking-wider text-red-500 bg-red-600/10 hover:bg-red-600/20 border border-red-600/30 transition-all"
-                title="Clear all messages"
-              >
-                🗑 Clear
-              </button>
+
+              <div className="flex items-center gap-3">
+                {/* 🚨 Phone number placed on the right side */}
+                {user?.role === 'admin' && activeContact.phone && (
+                  <span className="text-xs text-zinc-400 font-medium hidden sm:block">
+                    {activeContact.phone}
+                  </span>
+                )}
+                
+                <button
+                  type="button"
+                  onClick={handleClearChat}
+                  className="px-3 py-2 rounded-lg text-[10px] md:text-xs font-bold uppercase tracking-wider text-red-500 bg-red-600/10 hover:bg-red-600/20 border border-red-600/30 transition-all"
+                  title="Clear all messages"
+                >
+                  🗑 Clear
+                </button>
+              </div>
             </div>
           )}
 
