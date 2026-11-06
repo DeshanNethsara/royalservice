@@ -167,9 +167,7 @@ export default function Chat() {
       }
     });
 
-    // 🚨 DEBUG: Check what backend sends
     const handleContactsList = (list) => {
-      console.log("📥 Received contacts from backend:", list);
       setContacts(list);
       
       const initialCounts = {};
@@ -178,7 +176,6 @@ export default function Chat() {
           initialCounts[contact._id] = contact.unreadCount;
         }
       });
-      console.log("🔴 Setting unread counts to:", initialCounts);
       setUnreadCounts(initialCounts);
     };
     
@@ -337,14 +334,17 @@ export default function Chat() {
     if (!activeContact || !user) return;
     activeThreadRef.current = activeContact._id;
     socket.emit('fetch_history', activeContact._id);
-    // 🚨 FIX: Mark as read (which updates DB and clears local state)
-    socket.emit('mark_read', { threadId: activeContact._id, userId: getUserId() });
-    setUnreadCounts(prev => {
-      const updated = { ...prev };
-      delete updated[activeContact._id];
-      return updated;
-    });
-  }, [activeContact, user, getUserId]);
+    
+    // 🚨 FIX: Only mark as read if this contact has unread messages
+    if (unreadCounts[activeContact._id] > 0) {
+      socket.emit('mark_read', { threadId: activeContact._id, userId: getUserId() });
+      setUnreadCounts(prev => {
+        const updated = { ...prev };
+        delete updated[activeContact._id];
+        return updated;
+      });
+    }
+  }, [activeContact, user, getUserId, unreadCounts]);
 
   useEffect(() => {
     const container = messagesContainerRef.current;
