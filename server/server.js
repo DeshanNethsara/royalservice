@@ -41,7 +41,6 @@ const io = new Server(httpServer, {
 
 await connectDB();
 
-// 🚨 NEW: One-time cleanup to fix old messages
 Message.updateMany(
   { isRead: { $exists: false } },
   { $set: { isRead: false } }
@@ -122,7 +121,7 @@ io.on('connection', (socket) => {
     try {
       const roleFilter = socket.userRole === 'staff' 
         ? { role: 'admin' } 
-        : { role: { $in: ['customer', 'staff'] } };
+        : { role: { $in: ['customer', 'staff', 'user'] } }; // Added 'user' fallback
 
       const contacts = await User.find(roleFilter)
         .select('name email role phone')
@@ -133,10 +132,11 @@ io.on('connection', (socket) => {
           const lastMessage = await Message.findOne({ threadId: String(contact._id) })
             .sort({ createdAt: -1 }).select('createdAt text');
 
-          // 🚨 FIXED: Counts 'false' AND 'undefined' messages
+          // 🚨 FIX: We check if senderId equals the threadId. 
+          // This perfectly counts ONLY messages sent by this specific customer, avoiding role string typos.
           const unreadCount = await Message.countDocuments({
             threadId: String(contact._id),
-            senderRole: 'customer',
+            senderId: String(contact._id), 
             isRead: { $ne: true } 
           });
 
@@ -179,18 +179,20 @@ io.on('connection', (socket) => {
     try {
       if (!data || !data.senderId || !data.text) return;
 
+      // 🚨 FIX: Check if the message is coming from the customer by matching senderId to threadId
+      const isFromCustomer = String(data.senderId) === String(data.threadId);
+
       const messageData = {
         senderId: String(data.senderId),
         senderName: data.senderName,
         senderRole: data.senderRole,
         threadId: String(data.threadId),
         text: data.text.trim(),
-        isRead: data.senderRole !== 'customer' 
+        // If it is from the customer, it's NOT read. If it's from Admin/Bot, it is automatically read.
+        isRead: !isFromCustomer 
       };
 
       const newMsg = await Message.create(messageData);
-
-      console.log(`Message saved: ${newMsg.senderName} - ${newMsg.senderRole}`);
 
       io.emit('newMessage', newMsg); 
       
@@ -262,12 +264,12 @@ io.on('connection', (socket) => {
     }
   });
 
-  // 🚨 FIXED: Actually update the database when messages are read
   socket.on('mark_read', async ({ threadId, userId }) => {
     try {
       if (!threadId) return;
+      // 🚨 FIX: Explicitly target the customer's unread messages safely
       await Message.updateMany(
-        { threadId: String(threadId), senderRole: 'customer', isRead: { $ne: true } },
+        { threadId: String(threadId), senderId: String(threadId), isRead: { $ne: true } },
         { $set: { isRead: true } }
       );
       console.log(`Messages marked as read - Thread: ${threadId}`);
