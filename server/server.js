@@ -132,11 +132,11 @@ io.on('connection', (socket) => {
           const lastMessage = await Message.findOne({ threadId: String(contact._id) })
             .sort({ createdAt: -1 }).select('createdAt text');
 
-          // 🚨 FIX: Accurately target unread messages from this specific contact
+          // 🚨 BULLETPROOF FIX 1: Count unread strictly by role
           const unreadCount = await Message.countDocuments({
             threadId: String(contact._id),
-            senderId: String(contact._id), 
-            isRead: { $ne: true } 
+            senderRole: { $in: ['customer', 'user'] }, 
+            isRead: false 
           });
 
           return {
@@ -178,7 +178,8 @@ io.on('connection', (socket) => {
     try {
       if (!data || !data.senderId || !data.text) return;
 
-      const isFromCustomer = String(data.senderId) === String(data.threadId);
+      // 🚨 BULLETPROOF FIX 2: Explicitly flag customer messages as unread based on Role
+      const isCustomer = data.senderRole === 'customer' || data.senderRole === 'user';
 
       const messageData = {
         senderId: String(data.senderId),
@@ -186,8 +187,7 @@ io.on('connection', (socket) => {
         senderRole: data.senderRole,
         threadId: String(data.threadId),
         text: data.text.trim(),
-        // If it is from the customer, it's NOT read. If it's from Admin/Bot, it is automatically read.
-        isRead: !isFromCustomer 
+        isRead: isCustomer ? false : true 
       };
 
       const newMsg = await Message.create(messageData);
@@ -262,24 +262,28 @@ io.on('connection', (socket) => {
     }
   });
 
-  // 🚨 FINAL FIX: Prevent customers from marking their own messages as read
-  socket.on('mark_read', async ({ threadId, userId }) => {
+  // 🚨 BULLETPROOF FIX 3: Enforce that ONLY Admins can mark messages as read
+  socket.on('mark_read', async ({ threadId }) => {
     try {
-      if (!threadId || !userId) return;
+      if (!threadId) return;
+      
+      // If the socket making this request isn't an admin/staff, physically block it!
+      if (socket.userRole !== 'admin' && socket.userRole !== 'staff') {
+        return;
+      }
       
       const result = await Message.updateMany(
         { 
           threadId: String(threadId), 
-          senderId: { $ne: String(userId) }, // <-- The magic fix: Must NOT be the person who sent it
-          isRead: { $ne: true } 
+          senderRole: { $in: ['customer', 'user'] }, 
+          isRead: false
         },
         { $set: { isRead: true } }
       );
 
-      // (Optional but good) Broadcast chat_read so other logged-in admins see the badge disappear instantly
       if (result.modifiedCount > 0) {
         io.emit('chat_read', { threadId: String(threadId) });
-        console.log(`Read receipts updated for thread: ${threadId} by user: ${userId}`);
+        console.log(`Admin cleared read receipts for thread: ${threadId}`);
       }
     } catch (err) {
       console.error('Error marking messages as read:', err);
