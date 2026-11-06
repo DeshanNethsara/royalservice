@@ -5,7 +5,7 @@ import axiosClient from '../api/axiosClient';
 import toast from 'react-hot-toast';
 import io from 'socket.io-client';
 
-// Use environment variable for the socket URL
+// Use environment variable for the socket URL (removing /api)
 const SOCKET_URL = import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5000';
 
 export default function StaffDashboard() {
@@ -15,10 +15,10 @@ export default function StaffDashboard() {
   const [selectedBooking, setSelectedBooking] = useState(null);
   const [notes, setNotes] = useState('');
   
-  // 🚨 Mobile View State
+  // Mobile View State
   const [isMobileDetailOpen, setIsMobileDetailOpen] = useState(false);
 
-  // 🚨 NEW: Chat Notifications State
+  // Chat Notifications State
   const [unreadCount, setUnreadCount] = useState(0);
   
   const socketRef = useRef(null);
@@ -31,37 +31,52 @@ export default function StaffDashboard() {
 
     fetchBookings();
 
-    // 🚨 LIVE UPDATE: Connect to Socket.io
+    // 🚨 CONNECT TO SOCKET.IO
     socketRef.current = io(SOCKET_URL, {
       transports: ['websocket', 'polling']
     });
 
+    // 🚨 UNLOCK AUDIO FOR BROWSER SECURITY
+    const unlockAudio = () => {
+      const audio = new Audio('/notification.mp3');
+      audio.volume = 0;
+      audio.play().then(() => {
+        audio.pause();
+        document.removeEventListener('click', unlockAudio);
+      }).catch(() => {});
+    };
+    document.addEventListener('click', unlockAudio);
+
     socketRef.current.on('connect', () => {
       console.log('Staff Dashboard connected to live updates');
+      
       // Join room for chat messages
       socketRef.current.emit('joinRoom', user._id);
+      
+      // Tell backend we are online (matches server.js)
+      socketRef.current.emit('user_connected', { userId: user._id, role: user.role });
     });
 
-    // Listen for any booking updates (new booking, assigned staff, status change)
+    // Listen for any booking updates
     socketRef.current.on('contact_updated', () => {
       fetchBookings(); 
     });
 
-    // 🚨 NEW: Listen for new chat messages
+    // Listen for new chat messages
     socketRef.current.on('newMessage', (message) => {
+      console.log('📩 Received message:', message);
+      
       // Only notify if the message is NOT sent by the staff member themselves
       if (message.senderId !== user._id) {
-        // Play sound
         const audio = new Audio('/notification.mp3');
         audio.play().catch(err => console.log('Audio play blocked by browser:', err));
-
-        // Increment badge
         setUnreadCount((prev) => prev + 1);
       }
     });
 
     return () => {
       if (socketRef.current) socketRef.current.disconnect();
+      document.removeEventListener('click', unlockAudio);
     };
   }, [user, navigate]);
 
@@ -72,7 +87,7 @@ export default function StaffDashboard() {
         (b) => b.staff_id?._id === user._id || b.staff_id === user._id
       );
 
-      // 🚨 SORT: Latest jobs on top based on created_at or updated_at
+      // Sort: Latest jobs on top based on created_at or updated_at
       myTasks.sort((a, b) => new Date(b.updated_at || b.created_at) - new Date(a.updated_at || a.created_at));
       
       setBookings(myTasks);
@@ -105,7 +120,6 @@ export default function StaffDashboard() {
     }
   };
 
-  // 🚨 NEW: Clear unread count before navigating
   const handleChatRedirect = () => {
     setUnreadCount(0);
     navigate('/chat');
@@ -384,7 +398,7 @@ export default function StaffDashboard() {
               <path d="M12 3C6.477 3 2 6.94 2 11.79c0 2.7 1.44 5.11 3.72 6.74-.07.83-.33 2.25-1.05 3.15-.09.12-.01.3.14.31 1.18.08 2.87-.53 4.14-1.4.96.29 2 .45 3.05.45 5.523 0 10-3.94 10-8.79S17.523 3 12 3z" />
             </svg>
             
-            {/* 🚨 NEW: Notification Badge / Unread Count */}
+            {/* Notification Badge */}
             {unreadCount > 0 && (
               <span className="absolute -top-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white border-2 border-zinc-900 animate-bounce shadow-lg">
                 {unreadCount > 9 ? '9+' : unreadCount}

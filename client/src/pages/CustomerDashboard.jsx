@@ -3,7 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 import axiosClient from '../api/axiosClient';
 import toast from 'react-hot-toast';
-import { io } from 'socket.io-client'; // 🚨 NEW: Import Socket.IO
+import { io } from 'socket.io-client';
 
 export default function CustomerDashboard() {
   const { user, logout } = useContext(AuthContext);
@@ -15,10 +15,10 @@ export default function CustomerDashboard() {
   const [downloadingId, setDownloadingId] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
 
-  // 🚨 NEW: Chat Notifications State
+  // Chat Notifications State
   const [unreadCount, setUnreadCount] = useState(0);
 
-  // 🚨 NEW: Pagination State
+  // Pagination State
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
 
@@ -37,30 +37,49 @@ export default function CustomerDashboard() {
     fetchBookings();
   }, [user, navigate]);
 
-  // 🚨 NEW: Socket connection for real-time chat notifications
+  // 🚨 UPDATED: Socket connection to match server.js perfectly
   useEffect(() => {
     if (!user) return;
 
-    const socketUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000'; 
-    const socket = io(socketUrl, { withCredentials: true });
+    // 1. Remove '/api' from the URL
+    const socketUrl = import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5000'; 
+    const socket = io(socketUrl, { transports: ['websocket', 'polling'] });
+
+    // 2. Unlock audio for browser security policies
+    const unlockAudio = () => {
+      const audio = new Audio('/notification.mp3');
+      audio.volume = 0;
+      audio.play().then(() => {
+        audio.pause();
+        document.removeEventListener('click', unlockAudio);
+      }).catch(() => {});
+    };
+    document.addEventListener('click', unlockAudio);
 
     socket.on('connect', () => {
+      console.log('✅ Socket connected');
       socket.emit('joinRoom', user._id);
+      
+      // 3. Tell the backend we are online (matches server.js logic)
+      socket.emit('user_connected', { userId: user._id, role: user.role });
     });
 
+    // 4. Listen for 'newMessage'
     socket.on('newMessage', (message) => {
-      // Only notify if the message is NOT sent by the customer themselves (e.g., from admin/staff)
+      console.log('📩 Received message:', message);
+      
+      // Only trigger if the sender is NOT the current user
       if (message.senderId !== user._id) {
-        // Play Notification Sound
         const audio = new Audio('/notification.mp3');
-        audio.play().catch(err => console.log('Audio play blocked by browser:', err));
-
-        // Increment Unread Count
+        audio.play().catch(err => console.log('Audio error:', err));
         setUnreadCount((prev) => prev + 1);
       }
     });
 
-    return () => socket.disconnect();
+    return () => {
+      socket.disconnect();
+      document.removeEventListener('click', unlockAudio);
+    };
   }, [user]);
 
   const fetchBookings = async () => {
@@ -216,7 +235,6 @@ export default function CustomerDashboard() {
     }
   };
 
-  // 🚨 NEW: Clear unread count before navigating
   const handleChatRedirect = () => {
     setUnreadCount(0);
     navigate('/chat');
@@ -230,7 +248,6 @@ export default function CustomerDashboard() {
     return bookings.filter((b) => b.status === status).length;
   };
 
-  // 🚨 SORTING & FILTERING
   const filteredBookings = useMemo(() => {
     let filtered = bookings;
 
@@ -275,13 +292,11 @@ export default function CustomerDashboard() {
 
   }, [bookings, activeTab, searchTerm]);
 
-  // 🚨 PAGINATION MATH
   const indexOfLastItem = currentPage * itemsPerPage;
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
   const currentItems = filteredBookings.slice(indexOfFirstItem, indexOfLastItem);
   const totalPages = Math.ceil(filteredBookings.length / itemsPerPage);
 
-  // 🚨 RESET PAGE ON TAB/SEARCH CHANGE
   useEffect(() => {
     setCurrentPage(1);
   }, [activeTab, searchTerm]);
@@ -580,7 +595,7 @@ export default function CustomerDashboard() {
                 </div>
               </div>
 
-              {/* 🚨 NEW: PAGINATION CONTROLS */}
+              {/* Pagination Controls */}
               {totalPages > 1 && (
                 <div className="flex items-center justify-between mt-6 bg-zinc-900 border border-zinc-800 rounded-xl p-3">
                   <span className="text-sm text-zinc-400">
@@ -609,7 +624,7 @@ export default function CustomerDashboard() {
         </div>
       </main>
 
-      {/* 🚨 FLOATING CHAT BUTTON WITH NOTIFICATION BADGE */}
+      {/* FLOATING CHAT BUTTON WITH NOTIFICATION BADGE */}
       <button
         onClick={handleChatRedirect}
         className="fixed bottom-6 right-6 z-40 group"
@@ -624,7 +639,7 @@ export default function CustomerDashboard() {
               <path d="M12 3C6.477 3 2 6.94 2 11.79c0 2.7 1.44 5.11 3.72 6.74-.07.83-.33 2.25-1.05 3.15-.09.12-.01.3.14.31 1.18.08 2.87-.53 4.14-1.4.96.29 2 .45 3.05.45 5.523 0 10-3.94 10-8.79S17.523 3 12 3z" />
             </svg>
             
-            {/* 🚨 NEW: Notification Badge / Unread Count */}
+            {/* Notification Badge */}
             {unreadCount > 0 && (
               <span className="absolute -top-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white border-2 border-zinc-900 animate-bounce shadow-lg">
                 {unreadCount > 9 ? '9+' : unreadCount}

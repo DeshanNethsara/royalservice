@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 import axiosClient from '../api/axiosClient';
 import toast from 'react-hot-toast';
-import { io } from 'socket.io-client'; // 🚨 NEW: Import Socket.IO
+import { io } from 'socket.io-client';
 
 export default function AdminPanel() {
   const { user, logout } = useContext(AuthContext);
@@ -16,7 +16,7 @@ export default function AdminPanel() {
   const [users, setUsers] = useState([]);
   const [bookings, setBookings] = useState([]);
 
-  // 🚨 NEW: State for unread chat messages
+  // Chat Notifications State
   const [unreadCount, setUnreadCount] = useState(0);
 
   // Loading States
@@ -45,7 +45,7 @@ export default function AdminPanel() {
 
   // State for MONTHLY REPORT
   const [reportYear, setReportYear] = useState(new Date().getFullYear());
-  const [reportMonth, setReportMonth] = useState(new Date().getMonth()); // 0-11
+  const [reportMonth, setReportMonth] = useState(new Date().getMonth());
   const [reportData, setReportData] = useState(null);
 
   useEffect(() => {
@@ -56,30 +56,48 @@ export default function AdminPanel() {
     fetchAllData();
   }, [user, navigate]);
 
-  // 🚨 NEW: Socket connection for real-time chat notifications
+  // 🚨 UPDATED: Socket connection to match server.js
   useEffect(() => {
     if (!user) return;
 
-    const socketUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000'; 
-    const socket = io(socketUrl, { withCredentials: true });
+    // 1. Remove '/api' from URL
+    const socketUrl = import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5000'; 
+    const socket = io(socketUrl, { transports: ['websocket', 'polling'] });
+
+    // 2. Unlock audio
+    const unlockAudio = () => {
+      const audio = new Audio('/notification.mp3');
+      audio.volume = 0;
+      audio.play().then(() => {
+        audio.pause();
+        document.removeEventListener('click', unlockAudio);
+      }).catch(() => {});
+    };
+    document.addEventListener('click', unlockAudio);
 
     socket.on('connect', () => {
+      console.log('✅ Socket connected');
       socket.emit('joinRoom', user._id);
+      
+      // 3. Tell backend we are online
+      socket.emit('user_connected', { userId: user._id, role: user.role });
     });
 
+    // 4. Listen for new messages
     socket.on('newMessage', (message) => {
-      // Only notify if the message is NOT sent by the admin themselves
+      console.log('📩 Received message:', message);
+      
       if (message.senderId !== user._id) {
-        // Play sound
         const audio = new Audio('/notification.mp3');
-        audio.play().catch(err => console.log('Audio play blocked by browser:', err));
-
-        // Increment badge count
+        audio.play().catch(err => console.log('Audio error:', err));
         setUnreadCount((prev) => prev + 1);
       }
     });
 
-    return () => socket.disconnect();
+    return () => {
+      socket.disconnect();
+      document.removeEventListener('click', unlockAudio);
+    };
   }, [user]);
 
   const fetchAllData = async () => {
@@ -303,7 +321,7 @@ export default function AdminPanel() {
     }
   };
 
-  // GENERATE MONTHLY REPORT (Calculations for UI)
+  // GENERATE MONTHLY REPORT
   const handleGenerateReport = () => {
     const filtered = bookings.filter((b) => {
       if (!b.booking_date) return false;
@@ -339,7 +357,6 @@ export default function AdminPanel() {
     });
   };
 
-  // 🚨 DOWNLOAD PDF REPORT (Calls the Backend)
   const handleDownloadPDFReport = async () => {
     if (!reportData) return;
     const loadingToast = toast.loading('Generating PDF...');
@@ -368,9 +385,8 @@ export default function AdminPanel() {
     }
   };
 
-  // 🚨 NEW: Handle Chat Redirect & Clear Unread Count
   const handleChatRedirect = () => {
-    setUnreadCount(0); // Clear the badge
+    setUnreadCount(0);
     navigate('/chat');
   };
 
@@ -925,7 +941,6 @@ export default function AdminPanel() {
                   Generate Report
                 </button>
                 
-                {/* 🚨 FIXED: Only show download button if there are records */}
                 {reportData && reportData.bookings.length > 0 && (
                   <button
                     onClick={handleDownloadPDFReport}
@@ -938,7 +953,6 @@ export default function AdminPanel() {
                   </button>
                 )}
 
-                {/* Optional: Show a badge if report is empty */}
                 {reportData && reportData.bookings.length === 0 && (
                   <span className="text-xs font-bold text-amber-500 bg-amber-500/10 border border-amber-500/20 px-3 py-2 rounded-lg">
                     No records to download
@@ -1046,7 +1060,7 @@ export default function AdminPanel() {
         )}
       </div>
 
-      {/* 🚨 FLOATING CHAT BUTTON WITH NOTIFICATION BADGE */}
+      {/* FLOATING CHAT BUTTON WITH NOTIFICATION BADGE */}
       <button onClick={handleChatRedirect} className="fixed bottom-6 right-6 z-40 group">
         <span className="absolute inset-0 rounded-full bg-red-600/30 animate-ping opacity-75"></span>
         <span className="absolute inset-0 rounded-full bg-red-600/20 animate-pulse"></span>
@@ -1056,7 +1070,7 @@ export default function AdminPanel() {
               <path d="M12 3C6.477 3 2 6.94 2 11.79c0 2.7 1.44 5.11 3.72 6.74-.07.83-.33 2.25-1.05 3.15-.09.12-.01.3.14.31 1.18.08 2.87-.53 4.14-1.4.96.29 2 .45 3.05.45 5.523 0 10-3.94 10-8.79S17.523 3 12 3z" />
             </svg>
 
-            {/* 🚨 NEW: Unread Notification Badge */}
+            {/* Notification Badge */}
             {unreadCount > 0 && (
               <span className="absolute -top-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white border-2 border-zinc-900 animate-bounce shadow-lg">
                 {unreadCount > 9 ? '9+' : unreadCount}

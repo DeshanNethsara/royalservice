@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import axiosClient from '../api/axiosClient';
 import { AuthContext } from '../context/AuthContext';
 import toast from 'react-hot-toast';
-import { io } from 'socket.io-client'; // 🚨 NEW: Import Socket.IO
+import { io } from 'socket.io-client';
 
 // ==========================================================
 // SERVICE IMAGE MAP — Pexels
@@ -55,7 +55,6 @@ export default function Homepage() {
   const [currentSlide, setCurrentSlide] = useState(0);
   const [countersVisible, setCountersVisible] = useState(false);
   
-  // 🚨 NEW: Unread messages state
   const [unreadCount, setUnreadCount] = useState(0);
   
   const dropdownRef = useRef(null);
@@ -67,32 +66,12 @@ export default function Homepage() {
   const navigate = useNavigate();
 
   const heroSlides = [
-    // ... (keep your existing heroSlides array) ...
-    {
-      title: 'PREMIUM DETAILING',
-      subtitle: "It's time for your car to shine",
-      cta: 'Get Started',
-      image: 'https://images.pexels.com/photos/3729464/pexels-photo-3729464.jpeg?auto=compress&cs=tinysrgb&w=2940',
-      overlay: 'from-zinc-950/95 via-zinc-900/80 to-zinc-950/60',
-    },
-    {
-      title: 'EXPERT REPAIRS',
-      subtitle: 'Precision engineering for your vehicle',
-      cta: 'Book Now',
-      image: 'https://images.pexels.com/photos/4489704/pexels-photo-4489704.jpeg?auto=compress&cs=tinysrgb&w=2832',
-      overlay: 'from-blue-950/95 via-zinc-900/80 to-zinc-950/60',
-    },
-    {
-      title: 'WASH & GROOMING',
-      subtitle: 'Professional care for that showroom finish',
-      cta: 'Schedule Service',
-      image: 'https://images.unsplash.com/photo-1580273916550-e323be2ae537?q=80&w=2940&auto=format&fit=crop',
-      overlay: 'from-zinc-950/95 via-zinc-900/80 to-zinc-950/60',
-    },
+    { title: 'PREMIUM DETAILING', subtitle: "It's time for your car to shine", cta: 'Get Started', image: 'https://images.pexels.com/photos/3729464/pexels-photo-3729464.jpeg?auto=compress&cs=tinysrgb&w=2940', overlay: 'from-zinc-950/95 via-zinc-900/80 to-zinc-950/60' },
+    { title: 'EXPERT REPAIRS', subtitle: 'Precision engineering for your vehicle', cta: 'Book Now', image: 'https://images.pexels.com/photos/4489704/pexels-photo-4489704.jpeg?auto=compress&cs=tinysrgb&w=2832', overlay: 'from-blue-950/95 via-zinc-900/80 to-zinc-950/60' },
+    { title: 'WASH & GROOMING', subtitle: 'Professional care for that showroom finish', cta: 'Schedule Service', image: 'https://images.unsplash.com/photo-1580273916550-e323be2ae537?q=80&w=2940&auto=format&fit=crop', overlay: 'from-zinc-950/95 via-zinc-900/80 to-zinc-950/60' },
   ];
 
   const stats = [
-    // ... (keep your existing stats array) ...
     { value: 15, suffix: '+', label: 'Years Experience', description: 'Since 2009' },
     { value: 25, suffix: '+', label: 'Service Centres', description: 'Island Wide' },
     { value: 100, suffix: '%', label: 'Satisfaction', description: 'Guaranteed' },
@@ -100,42 +79,56 @@ export default function Homepage() {
   ];
 
   const aboutFeatures = [
-    // ... (keep your existing aboutFeatures array) ...
     { title: 'Certified Technicians', description: 'Manufacturer-trained experts for all vehicle types' },
     { title: 'Genuine Parts Only', description: 'We use only authentic OEM parts for every repair' },
     { title: 'State-of-the-Art Facilities', description: 'Latest diagnostic and repair equipment' },
     { title: 'Warranty Guaranteed', description: 'All services backed by our comprehensive warranty' },
   ];
 
-  // 🚨 NEW: Socket connection for real-time chat notifications
+  // 🚨 UPDATED: Socket connection to match your server.js
   useEffect(() => {
     if (!user) return;
 
-    // Use your actual backend URL from env variables
-    const socketUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000'; 
-    const socket = io(socketUrl, { withCredentials: true });
+    const socketUrl = import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5000'; 
+    const socket = io(socketUrl, { transports: ['websocket', 'polling'] });
+
+    // Unlock audio for browser security policies
+    const unlockAudio = () => {
+      const audio = new Audio('/notification.mp3');
+      audio.volume = 0;
+      audio.play().then(() => {
+        audio.pause();
+        document.removeEventListener('click', unlockAudio);
+      }).catch(() => {});
+    };
+    document.addEventListener('click', unlockAudio);
 
     socket.on('connect', () => {
-      // Join a specific room for this user
+      console.log('✅ Socket connected');
+      // Join the user's room
       socket.emit('joinRoom', user._id);
+      // Notify backend that this user is online (needed for your server.js logic)
+      socket.emit('user_connected', { userId: user._id, role: user.role });
     });
 
+    // 🚨 Listen for the correct event name
     socket.on('newMessage', (message) => {
-      // Check if the message is from someone else (not the logged-in user)
+      console.log('📩 Received message:', message);
+      
+      // Only play sound and show badge if message is from someone else
       if (message.senderId !== user._id) {
-        // 1. Play Notification Sound
         const audio = new Audio('/notification.mp3');
-        audio.play().catch(err => console.log('Audio play blocked by browser:', err));
-
-        // 2. Increment Unread Count
+        audio.play().catch(err => console.log('Audio error:', err));
         setUnreadCount((prev) => prev + 1);
       }
     });
 
-    return () => socket.disconnect();
+    return () => {
+      socket.disconnect();
+      document.removeEventListener('click', unlockAudio);
+    };
   }, [user]);
 
-  // ... (Keep your existing useEffects for fetchServices, slider, intersection observers) ...
   useEffect(() => {
     const fetchServices = async () => {
       try {
@@ -262,8 +255,7 @@ export default function Homepage() {
       return;
     }
     
-    // 🚨 NEW: Clear unread count when user opens the chat
-    setUnreadCount(0);
+    setUnreadCount(0); // Clear badge
     navigate('/chat');
   };
 
@@ -272,9 +264,6 @@ export default function Homepage() {
     if (typeof service.price === 'number') return service.price;
     return 0;
   };
-
-  const nextSlide = () => setCurrentSlide((prev) => (prev + 1) % heroSlides.length);
-  const prevSlide = () => setCurrentSlide((prev) => (prev - 1 + heroSlides.length) % heroSlides.length);
 
   return (
     <div className="min-h-screen bg-white font-sans text-zinc-900">
@@ -299,9 +288,8 @@ export default function Homepage() {
         </div>
       </div>
 
-      {/* Header (Truncated for brevity, keep your existing header code) */}
+      {/* Header */}
       <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-xl border-b border-zinc-200 shadow-sm">
-         {/* ... (Keep existing Header code exactly as it was) ... */}
          <div className="max-w-7xl mx-auto px-4 md:px-6 py-3 md:py-4 flex justify-between items-center">
           
           <div className="flex items-center gap-2 md:gap-3 cursor-pointer" onClick={scrollToTop} role="button" aria-label="Go to homepage">
@@ -386,7 +374,6 @@ export default function Homepage() {
 
         {isMobileMenuOpen && (
           <div className="lg:hidden absolute top-full left-0 right-0 bg-white border-b border-zinc-200 shadow-xl overflow-y-auto max-h-[85vh]">
-             {/* ... (Keep existing mobile menu code) ... */}
              <div className="px-4 py-4 space-y-1">
               <button onClick={scrollToTop} className="block w-full text-left px-4 py-3 text-zinc-700 hover:text-red-600 hover:bg-zinc-50 rounded-lg font-medium">Home</button>
               <button onClick={scrollToAbout} className="block w-full text-left px-4 py-3 text-zinc-700 hover:text-red-600 hover:bg-zinc-50 rounded-lg font-medium">About Us</button>
@@ -416,8 +403,7 @@ export default function Homepage() {
         )}
       </header>
 
-      {/* Hero Carousel (Truncated for brevity, keep your existing code) */}
-      {/* ... Keep your Hero Carousel section exactly as it was ... */}
+      {/* Hero Carousel */}
       <section className="relative h-[75vh] md:h-[85vh] min-h-[500px] md:min-h-[600px] overflow-hidden">
         {heroSlides.map((slide, index) => (
           <div key={index} className={`absolute inset-0 transition-opacity duration-1000 ${index === currentSlide ? 'opacity-100 z-10' : 'opacity-0 z-0'}`}>
@@ -451,8 +437,7 @@ export default function Homepage() {
         </div>
       </section>
 
-      {/* Stats Section (Truncated, keep existing code) */}
-      {/* ... Keep your Stats section exactly as it was ... */}
+      {/* Stats Section */}
       <section ref={countersRef} className="py-16 md:py-20 bg-zinc-900 relative overflow-hidden">
         <div className="max-w-7xl mx-auto px-4 md:px-6 relative z-10">
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 md:gap-8">
@@ -469,8 +454,7 @@ export default function Homepage() {
         </div>
       </section>
 
-      {/* About Section (Truncated, keep existing code) */}
-      {/* ... Keep your About section exactly as it was ... */}
+      {/* About Section */}
       <section ref={aboutRef} className="py-16 md:py-24 bg-white scroll-mt-24">
         <div className="max-w-7xl mx-auto px-4 md:px-6">
           <div className="grid lg:grid-cols-2 gap-10 md:gap-16 items-center">
@@ -506,8 +490,7 @@ export default function Homepage() {
         </div>
       </section>
 
-      {/* Services Grid (Truncated, keep existing code) */}
-      {/* ... Keep your Services Grid exactly as it was ... */}
+      {/* Services Grid */}
       <section ref={servicesRef} className="py-16 md:py-24 bg-zinc-50 scroll-mt-24">
         <div className="max-w-7xl mx-auto px-4 md:px-6">
           <div className={`flex flex-col md:flex-row justify-between items-end mb-10 md:mb-16 transition-all duration-700 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
@@ -569,8 +552,7 @@ export default function Homepage() {
         </div>
       </section>
 
-      {/* Contact Section (Truncated, keep existing code) */}
-      {/* ... Keep your Contact Section exactly as it was ... */}
+      {/* Contact Section */}
       <section ref={contactRef} className="py-16 md:py-24 bg-zinc-900 scroll-mt-24 relative overflow-hidden">
         <div className="max-w-7xl mx-auto px-4 md:px-6 relative z-10">
           <div className="text-center mb-10 md:mb-16">
@@ -616,8 +598,7 @@ export default function Homepage() {
         </div>
       </section>
 
-      {/* Footer (Truncated, keep existing code) */}
-      {/* ... Keep your Footer exactly as it was ... */}
+      {/* Footer */}
       <footer className="bg-zinc-950 pt-12 md:pt-16 pb-6 md:pb-8 border-t border-zinc-800">
          <div className="max-w-7xl mx-auto px-4 md:px-6">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8 md:gap-12 mb-8 md:mb-12">
@@ -667,7 +648,7 @@ export default function Homepage() {
         </div>
       </footer>
 
-      {/* 🚨 FLOATING CHAT BUTTON WITH NOTIFICATION BADGE */}
+      {/* FLOATING CHAT BUTTON WITH NOTIFICATION BADGE */}
       <button
         onClick={handleChatRedirect}
         className="fixed bottom-4 right-4 md:bottom-6 md:right-6 z-40 group"
@@ -682,14 +663,14 @@ export default function Homepage() {
               <path d="M12 3C6.477 3 2 6.94 2 11.79c0 2.7 1.44 5.11 3.72 6.74-.07.83-.33 2.25-1.05 3.15-.09.12-.01.3.14.31 1.18.08 2.87-.53 4.14-1.4.96.29 2 .45 3.05.45 5.523 0 10-3.94 10-8.79S17.523 3 12 3z" />
             </svg>
             
-            {/* 🚨 NEW: Notification Badge / Unread Count */}
+            {/* Notification Badge */}
             {unreadCount > 0 && (
               <span className="absolute -top-1.5 -right-1.5 md:-top-2 md:-right-2 flex h-4 w-4 md:h-5 md:w-5 items-center justify-center rounded-full bg-red-500 text-[9px] md:text-[10px] font-bold text-white border-2 border-zinc-900 animate-bounce shadow-lg">
                 {unreadCount > 9 ? '9+' : unreadCount}
               </span>
             )}
 
-            {/* Online status dot (optional, will overlap if unread > 0, might want to hide it when unread > 0) */}
+            {/* Online status dot */}
             {unreadCount === 0 && (
               <span className="absolute -top-0.5 -right-0.5 w-2 h-2 md:w-2.5 md:h-2.5 rounded-full bg-emerald-400 border md:border-2 border-red-600"></span>
             )}

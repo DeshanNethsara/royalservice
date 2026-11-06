@@ -4,14 +4,11 @@ import cors from 'cors';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
 
-// 🚨 NEW: Security Middleware Imports
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
-// 🚨 UPDATED: Using the Express 5 compatible fork
 import mongoSanitize from '@exortek/express-mongo-sanitize';
 
 import connectDB from './configs/db.js';
-
 import Message from './models/Message.js';
 import User from './models/User.js';
 
@@ -21,25 +18,16 @@ import serviceRoutes from './routes/serviceRoutes.js';
 import bookingRoutes from './routes/bookingRoutes.js';
 
 const app = express();
-
-// 🚨 CRITICAL FIX: Trust Render's proxy so rate limiting works per-user, not globally
 app.set('trust proxy', 1);
-
 const httpServer = createServer(app);
 
-// =========================
-// CORS CONFIGURATION
-// =========================
 const allowedOrigins = [
   'http://localhost:5173',
   'https://royalservice.tech',
   'https://www.royalservice.tech',
-  process.env.CLIENT_URL // Pulls from your Render environment variable
+  process.env.CLIENT_URL
 ].filter(Boolean); 
 
-// =========================
-// SOCKET.IO
-// =========================
 const io = new Server(httpServer, {
   cors: {
     origin: allowedOrigins,
@@ -48,14 +36,8 @@ const io = new Server(httpServer, {
   }
 });
 
-// =========================
-// DATABASE
-// =========================
 await connectDB();
 
-// =========================
-// EXPRESS CORS
-// =========================
 const corsOptions = {
   origin: allowedOrigins,
   credentials: true,
@@ -65,68 +47,44 @@ const corsOptions = {
 };
 
 app.use(cors(corsOptions));
-
-// =========================
-// 🚨 SECURITY MIDDLEWARE
-// =========================
-
-// 1. Helmet: Sets HTTP security headers (protects against XSS, clickjacking, etc.)
 app.use(helmet());
-
-// 2. Data Sanitization: Prevents NoSQL injection attacks
 app.use(mongoSanitize());
 
-// 3. Rate Limiting: Prevents brute-force attacks on login/register routes
 const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 20, // Limit each IP to 20 requests per windowMs
+  windowMs: 15 * 60 * 1000,
+  max: 20,
   message: 'Too many login attempts from this IP, please try again after 15 minutes',
   standardHeaders: true,
   legacyHeaders: false,
 });
 
-// =========================
-// STANDARD MIDDLEWARE
-// =========================
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ limit: '10mb', extended: true }));
 
-app.use(
-  express.json({
-    limit: '10mb'
-  })
-);
-
-app.use(
-  express.urlencoded({
-    limit: '10mb',
-    extended: true
-  })
-);
-
-// =========================
-// API ROUTES
-// =========================
-
-// Apply the rate limiter to authentication routes
 app.use('/api/auth', authLimiter, authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/services', serviceRoutes);
 app.use('/api/bookings', bookingRoutes);
-
-// =========================
-// SOCKET CONNECTION
-// =========================
 
 const onlineUsers = new Map();
 
 io.on('connection', (socket) => {
   console.log(`User connected to Comms-Link: ${socket.id}`);
 
+  // 🚨 FIX 1: Handle the 'joinRoom' event from the frontend
+  socket.on('joinRoom', (userId) => {
+    socket.join(userId);
+    console.log(`Socket ${socket.id} joined room ${userId}`);
+  });
+
   socket.on('user_connected', async ({ userId, role }) => {
     if (userId) {
       onlineUsers.set(userId, socket.id);
       socket.userId = userId;
       socket.userRole = role;
-      console.log(`User ${userId} (${role}) is online`);
+      
+      // Make sure they are in their own room
+      socket.join(userId);
 
       if (role === 'admin') {
         socket.emit('fetch_contacts');
@@ -154,17 +112,12 @@ io.on('connection', (socket) => {
     try {
       const contacts = await User.find({
         role: { $in: ['customer', 'staff'] }
-      })
-        .select('name email role')
-        .sort({ role: 1, name: 1 });
+      }).select('name email role').sort({ role: 1, name: 1 });
 
       const contactsWithLastMessage = await Promise.all(
         contacts.map(async (contact) => {
-          const lastMessage = await Message.findOne({
-            threadId: String(contact._id)
-          })
-            .sort({ createdAt: -1 })
-            .select('createdAt');
+          const lastMessage = await Message.findOne({ threadId: String(contact._id) })
+            .sort({ createdAt: -1 }).select('createdAt');
 
           return {
             ...contact.toObject(),
@@ -175,9 +128,7 @@ io.on('connection', (socket) => {
       );
 
       contactsWithLastMessage.sort((a, b) => {
-        if (a.lastMessageAt && b.lastMessageAt) {
-          return new Date(b.lastMessageAt) - new Date(a.lastMessageAt);
-        }
+        if (a.lastMessageAt && b.lastMessageAt) return new Date(b.lastMessageAt) - new Date(a.lastMessageAt);
         if (a.lastMessageAt) return -1;
         if (b.lastMessageAt) return 1;
         if (a.isOnline && !b.isOnline) return -1;
@@ -193,10 +144,7 @@ io.on('connection', (socket) => {
 
   socket.on('fetch_history', async (threadId) => {
     try {
-      const history = await Message.find({
-        threadId: String(threadId)
-      }).sort({ createdAt: 1 });
-
+      const history = await Message.find({ threadId: String(threadId) }).sort({ createdAt: 1 });
       socket.emit('chat_history', history);
     } catch (err) {
       console.error('Error fetching history:', err);
@@ -206,12 +154,7 @@ io.on('connection', (socket) => {
 
   socket.on('send_message', async (data) => {
     try {
-      if (!data) return;
-      if (!data.senderId) { console.error('Missing senderId'); return; }
-      if (!data.senderName) { console.error('Missing senderName'); return; }
-      if (!data.senderRole) { console.error('Missing senderRole'); return; }
-      if (!data.threadId) { console.error('Missing threadId'); return; }
-      if (!data.text || !data.text.trim()) { console.error('Missing message text'); return; }
+      if (!data || !data.senderId || !data.text) return;
 
       const messageData = {
         senderId: String(data.senderId),
@@ -225,7 +168,9 @@ io.on('connection', (socket) => {
 
       console.log(`Message saved: ${newMsg.senderName} - ${newMsg.senderRole}`);
 
-      io.emit('receive_message', newMsg);
+      // 🚨 FIX 2: Emit as 'newMessage' to match the frontend listener
+      io.emit('newMessage', newMsg); 
+      
       io.emit('contact_updated', {
         threadId: String(data.threadId),
         lastMessageAt: newMsg.createdAt
@@ -247,7 +192,6 @@ io.on('connection', (socket) => {
     try {
       if (!threadId) return;
       await Message.deleteMany({ threadId: String(threadId) });
-      console.log(`Chat cleared: ${threadId}`);
       io.emit('chat_cleared', { threadId: String(threadId) });
       io.emit('contact_updated', { threadId: String(threadId), lastMessageAt: null });
     } catch (err) {
@@ -257,13 +201,8 @@ io.on('connection', (socket) => {
 
   socket.on('delete_chat', async ({ threadId, userId, role }) => {
     try {
-      if (!threadId) return;
-      if (role !== 'admin') {
-        console.log(`User ${userId} attempted to delete chat without admin rights`);
-        return;
-      }
+      if (!threadId || role !== 'admin') return;
       await Message.deleteMany({ threadId: String(threadId) });
-      console.log(`Chat deleted completely: ${threadId}`);
       io.emit('chat_deleted', { threadId: String(threadId) });
     } catch (err) {
       console.error('Error deleting chat:', err);
@@ -276,11 +215,9 @@ io.on('connection', (socket) => {
 
   socket.on('disconnect', () => {
     console.log(`User disconnected: ${socket.id}`);
-
     for (const [userId, socketId] of onlineUsers.entries()) {
       if (socketId === socket.id) {
         onlineUsers.delete(userId);
-        console.log(`User ${userId} is offline`);
         io.emit('user_offline', { userId });
         break;
       }
@@ -288,11 +225,7 @@ io.on('connection', (socket) => {
   });
 });
 
-// =========================
-// START SERVER
-// =========================
 const PORT = process.env.PORT || 5000;
-
 httpServer.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
