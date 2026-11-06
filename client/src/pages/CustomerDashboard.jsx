@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 import axiosClient from '../api/axiosClient';
 import toast from 'react-hot-toast';
+import { io } from 'socket.io-client'; // 🚨 NEW: Import Socket.IO
 
 export default function CustomerDashboard() {
   const { user, logout } = useContext(AuthContext);
@@ -13,6 +14,9 @@ export default function CustomerDashboard() {
   const [cancellingId, setCancellingId] = useState(null);
   const [downloadingId, setDownloadingId] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
+
+  // 🚨 NEW: Chat Notifications State
+  const [unreadCount, setUnreadCount] = useState(0);
 
   // 🚨 NEW: Pagination State
   const [currentPage, setCurrentPage] = useState(1);
@@ -32,6 +36,32 @@ export default function CustomerDashboard() {
     }
     fetchBookings();
   }, [user, navigate]);
+
+  // 🚨 NEW: Socket connection for real-time chat notifications
+  useEffect(() => {
+    if (!user) return;
+
+    const socketUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000'; 
+    const socket = io(socketUrl, { withCredentials: true });
+
+    socket.on('connect', () => {
+      socket.emit('joinRoom', user._id);
+    });
+
+    socket.on('newMessage', (message) => {
+      // Only notify if the message is NOT sent by the customer themselves (e.g., from admin/staff)
+      if (message.senderId !== user._id) {
+        // Play Notification Sound
+        const audio = new Audio('/notification.mp3');
+        audio.play().catch(err => console.log('Audio play blocked by browser:', err));
+
+        // Increment Unread Count
+        setUnreadCount((prev) => prev + 1);
+      }
+    });
+
+    return () => socket.disconnect();
+  }, [user]);
 
   const fetchBookings = async () => {
     try {
@@ -186,7 +216,9 @@ export default function CustomerDashboard() {
     }
   };
 
+  // 🚨 NEW: Clear unread count before navigating
   const handleChatRedirect = () => {
+    setUnreadCount(0);
     navigate('/chat');
   };
 
@@ -577,10 +609,11 @@ export default function CustomerDashboard() {
         </div>
       </main>
 
-      {/* Chat Button */}
+      {/* 🚨 FLOATING CHAT BUTTON WITH NOTIFICATION BADGE */}
       <button
         onClick={handleChatRedirect}
         className="fixed bottom-6 right-6 z-40 group"
+        aria-label="Chat with our support team"
       >
         <span className="absolute inset-0 rounded-full bg-red-600/30 animate-ping opacity-75"></span>
         <span className="absolute inset-0 rounded-full bg-red-600/20 animate-pulse"></span>
@@ -590,7 +623,18 @@ export default function CustomerDashboard() {
             <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 24 24">
               <path d="M12 3C6.477 3 2 6.94 2 11.79c0 2.7 1.44 5.11 3.72 6.74-.07.83-.33 2.25-1.05 3.15-.09.12-.01.3.14.31 1.18.08 2.87-.53 4.14-1.4.96.29 2 .45 3.05.45 5.523 0 10-3.94 10-8.79S17.523 3 12 3z" />
             </svg>
-            <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-400 border-2 border-red-600"></span>
+            
+            {/* 🚨 NEW: Notification Badge / Unread Count */}
+            {unreadCount > 0 && (
+              <span className="absolute -top-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white border-2 border-zinc-900 animate-bounce shadow-lg">
+                {unreadCount > 9 ? '9+' : unreadCount}
+              </span>
+            )}
+
+            {/* Show online dot only if no unread messages */}
+            {unreadCount === 0 && (
+              <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-400 border-2 border-red-600"></span>
+            )}
           </span>
           <span className="text-xs font-black tracking-widest uppercase whitespace-nowrap">Chat</span>
         </span>

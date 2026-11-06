@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 import axiosClient from '../api/axiosClient';
 import toast from 'react-hot-toast';
+import { io } from 'socket.io-client'; // 🚨 NEW: Import Socket.IO
 
 export default function AdminPanel() {
   const { user, logout } = useContext(AuthContext);
@@ -14,6 +15,9 @@ export default function AdminPanel() {
   const [services, setServices] = useState([]);
   const [users, setUsers] = useState([]);
   const [bookings, setBookings] = useState([]);
+
+  // 🚨 NEW: State for unread chat messages
+  const [unreadCount, setUnreadCount] = useState(0);
 
   // Loading States
   const [loading, setLoading] = useState({
@@ -51,6 +55,32 @@ export default function AdminPanel() {
     }
     fetchAllData();
   }, [user, navigate]);
+
+  // 🚨 NEW: Socket connection for real-time chat notifications
+  useEffect(() => {
+    if (!user) return;
+
+    const socketUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000'; 
+    const socket = io(socketUrl, { withCredentials: true });
+
+    socket.on('connect', () => {
+      socket.emit('joinRoom', user._id);
+    });
+
+    socket.on('newMessage', (message) => {
+      // Only notify if the message is NOT sent by the admin themselves
+      if (message.senderId !== user._id) {
+        // Play sound
+        const audio = new Audio('/notification.mp3');
+        audio.play().catch(err => console.log('Audio play blocked by browser:', err));
+
+        // Increment badge count
+        setUnreadCount((prev) => prev + 1);
+      }
+    });
+
+    return () => socket.disconnect();
+  }, [user]);
 
   const fetchAllData = async () => {
     try {
@@ -336,6 +366,12 @@ export default function AdminPanel() {
       toast.dismiss(loadingToast);
       toast.error('Failed to generate PDF report');
     }
+  };
+
+  // 🚨 NEW: Handle Chat Redirect & Clear Unread Count
+  const handleChatRedirect = () => {
+    setUnreadCount(0); // Clear the badge
+    navigate('/chat');
   };
 
   // Filtered data
@@ -1010,8 +1046,8 @@ export default function AdminPanel() {
         )}
       </div>
 
-      {/* MODERN FLOATING CHAT BUTTON */}
-      <button onClick={() => navigate('/chat')} className="fixed bottom-6 right-6 z-40 group">
+      {/* 🚨 FLOATING CHAT BUTTON WITH NOTIFICATION BADGE */}
+      <button onClick={handleChatRedirect} className="fixed bottom-6 right-6 z-40 group">
         <span className="absolute inset-0 rounded-full bg-red-600/30 animate-ping opacity-75"></span>
         <span className="absolute inset-0 rounded-full bg-red-600/20 animate-pulse"></span>
         <span className="relative flex items-center gap-2 bg-gradient-to-br from-red-500 via-red-600 to-red-700 hover:from-red-600 hover:via-red-700 hover:to-red-800 text-white pl-3 pr-4 py-3 rounded-full shadow-2xl shadow-red-600/40 hover:shadow-red-600/60 transition-all duration-300 hover:scale-105">
@@ -1019,7 +1055,18 @@ export default function AdminPanel() {
             <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 24 24">
               <path d="M12 3C6.477 3 2 6.94 2 11.79c0 2.7 1.44 5.11 3.72 6.74-.07.83-.33 2.25-1.05 3.15-.09.12-.01.3.14.31 1.18.08 2.87-.53 4.14-1.4.96.29 2 .45 3.05.45 5.523 0 10-3.94 10-8.79S17.523 3 12 3z" />
             </svg>
-            <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-400 border-2 border-red-600"></span>
+
+            {/* 🚨 NEW: Unread Notification Badge */}
+            {unreadCount > 0 && (
+              <span className="absolute -top-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white border-2 border-zinc-900 animate-bounce shadow-lg">
+                {unreadCount > 9 ? '9+' : unreadCount}
+              </span>
+            )}
+            
+            {/* Show online dot only if no unread messages */}
+            {unreadCount === 0 && (
+              <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-400 border-2 border-red-600"></span>
+            )}
           </span>
           <span className="text-xs font-black tracking-widest uppercase whitespace-nowrap">Chat</span>
           <span className="absolute inset-0 rounded-full bg-gradient-to-r from-transparent via-white/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"></span>

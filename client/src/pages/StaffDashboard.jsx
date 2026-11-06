@@ -17,6 +17,9 @@ export default function StaffDashboard() {
   
   // 🚨 Mobile View State
   const [isMobileDetailOpen, setIsMobileDetailOpen] = useState(false);
+
+  // 🚨 NEW: Chat Notifications State
+  const [unreadCount, setUnreadCount] = useState(0);
   
   const socketRef = useRef(null);
 
@@ -35,6 +38,8 @@ export default function StaffDashboard() {
 
     socketRef.current.on('connect', () => {
       console.log('Staff Dashboard connected to live updates');
+      // Join room for chat messages
+      socketRef.current.emit('joinRoom', user._id);
     });
 
     // Listen for any booking updates (new booking, assigned staff, status change)
@@ -42,8 +47,18 @@ export default function StaffDashboard() {
       fetchBookings(); 
     });
 
-    // If the admin makes changes, we can also listen to a generic update if you add one later.
-    // For now, polling every 30 seconds as a fallback + the socket listener covers it.
+    // 🚨 NEW: Listen for new chat messages
+    socketRef.current.on('newMessage', (message) => {
+      // Only notify if the message is NOT sent by the staff member themselves
+      if (message.senderId !== user._id) {
+        // Play sound
+        const audio = new Audio('/notification.mp3');
+        audio.play().catch(err => console.log('Audio play blocked by browser:', err));
+
+        // Increment badge
+        setUnreadCount((prev) => prev + 1);
+      }
+    });
 
     return () => {
       if (socketRef.current) socketRef.current.disconnect();
@@ -90,7 +105,9 @@ export default function StaffDashboard() {
     }
   };
 
+  // 🚨 NEW: Clear unread count before navigating
   const handleChatRedirect = () => {
+    setUnreadCount(0);
     navigate('/chat');
   };
 
@@ -352,7 +369,7 @@ export default function StaffDashboard() {
         )}
       </div>
 
-      {/* Floating Chat Button (Hidden on Mobile if detail is open) */}
+      {/* 🚨 FLOATING CHAT BUTTON WITH NOTIFICATION BADGE */}
       <button
         onClick={handleChatRedirect}
         className={`fixed bottom-6 right-6 z-40 group ${isMobileDetailOpen ? 'hidden md:block' : 'block'}`}
@@ -366,7 +383,18 @@ export default function StaffDashboard() {
             <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 24 24">
               <path d="M12 3C6.477 3 2 6.94 2 11.79c0 2.7 1.44 5.11 3.72 6.74-.07.83-.33 2.25-1.05 3.15-.09.12-.01.3.14.31 1.18.08 2.87-.53 4.14-1.4.96.29 2 .45 3.05.45 5.523 0 10-3.94 10-8.79S17.523 3 12 3z" />
             </svg>
-            <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-400 border-2 border-red-600"></span>
+            
+            {/* 🚨 NEW: Notification Badge / Unread Count */}
+            {unreadCount > 0 && (
+              <span className="absolute -top-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white border-2 border-zinc-900 animate-bounce shadow-lg">
+                {unreadCount > 9 ? '9+' : unreadCount}
+              </span>
+            )}
+
+            {/* Show online dot only if no unread messages */}
+            {unreadCount === 0 && (
+              <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-400 border-2 border-red-600"></span>
+            )}
           </span>
           <span className="text-xs font-black tracking-widest uppercase whitespace-nowrap">
             Chat

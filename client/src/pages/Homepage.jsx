@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import axiosClient from '../api/axiosClient';
 import { AuthContext } from '../context/AuthContext';
 import toast from 'react-hot-toast';
+import { io } from 'socket.io-client'; // 🚨 NEW: Import Socket.IO
 
 // ==========================================================
 // SERVICE IMAGE MAP — Pexels
@@ -53,6 +54,10 @@ export default function Homepage() {
   const [isVisible, setIsVisible] = useState(false);
   const [currentSlide, setCurrentSlide] = useState(0);
   const [countersVisible, setCountersVisible] = useState(false);
+  
+  // 🚨 NEW: Unread messages state
+  const [unreadCount, setUnreadCount] = useState(0);
+  
   const dropdownRef = useRef(null);
   const servicesRef = useRef(null);
   const aboutRef = useRef(null);
@@ -62,6 +67,7 @@ export default function Homepage() {
   const navigate = useNavigate();
 
   const heroSlides = [
+    // ... (keep your existing heroSlides array) ...
     {
       title: 'PREMIUM DETAILING',
       subtitle: "It's time for your car to shine",
@@ -86,6 +92,7 @@ export default function Homepage() {
   ];
 
   const stats = [
+    // ... (keep your existing stats array) ...
     { value: 15, suffix: '+', label: 'Years Experience', description: 'Since 2009' },
     { value: 25, suffix: '+', label: 'Service Centres', description: 'Island Wide' },
     { value: 100, suffix: '%', label: 'Satisfaction', description: 'Guaranteed' },
@@ -93,24 +100,42 @@ export default function Homepage() {
   ];
 
   const aboutFeatures = [
-    {
-      title: 'Certified Technicians',
-      description: 'Manufacturer-trained experts for all vehicle types',
-    },
-    {
-      title: 'Genuine Parts Only',
-      description: 'We use only authentic OEM parts for every repair',
-    },
-    {
-      title: 'State-of-the-Art Facilities',
-      description: 'Latest diagnostic and repair equipment',
-    },
-    {
-      title: 'Warranty Guaranteed',
-      description: 'All services backed by our comprehensive warranty',
-    },
+    // ... (keep your existing aboutFeatures array) ...
+    { title: 'Certified Technicians', description: 'Manufacturer-trained experts for all vehicle types' },
+    { title: 'Genuine Parts Only', description: 'We use only authentic OEM parts for every repair' },
+    { title: 'State-of-the-Art Facilities', description: 'Latest diagnostic and repair equipment' },
+    { title: 'Warranty Guaranteed', description: 'All services backed by our comprehensive warranty' },
   ];
 
+  // 🚨 NEW: Socket connection for real-time chat notifications
+  useEffect(() => {
+    if (!user) return;
+
+    // Use your actual backend URL from env variables
+    const socketUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000'; 
+    const socket = io(socketUrl, { withCredentials: true });
+
+    socket.on('connect', () => {
+      // Join a specific room for this user
+      socket.emit('joinRoom', user._id);
+    });
+
+    socket.on('newMessage', (message) => {
+      // Check if the message is from someone else (not the logged-in user)
+      if (message.senderId !== user._id) {
+        // 1. Play Notification Sound
+        const audio = new Audio('/notification.mp3');
+        audio.play().catch(err => console.log('Audio play blocked by browser:', err));
+
+        // 2. Increment Unread Count
+        setUnreadCount((prev) => prev + 1);
+      }
+    });
+
+    return () => socket.disconnect();
+  }, [user]);
+
+  // ... (Keep your existing useEffects for fetchServices, slider, intersection observers) ...
   useEffect(() => {
     const fetchServices = async () => {
       try {
@@ -166,9 +191,7 @@ export default function Homepage() {
       },
       { threshold: 0.1 }
     );
-    if (servicesRef.current) {
-      observer.observe(servicesRef.current);
-    }
+    if (servicesRef.current) observer.observe(servicesRef.current);
     return () => observer.disconnect();
   }, []);
 
@@ -182,9 +205,7 @@ export default function Homepage() {
       },
       { threshold: 0.3 }
     );
-    if (countersRef.current) {
-      observer.observe(countersRef.current);
-    }
+    if (countersRef.current) observer.observe(countersRef.current);
     return () => observer.disconnect();
   }, []);
 
@@ -200,11 +221,7 @@ export default function Homepage() {
     } else {
       toast('Please sign in to book a service', {
         icon: '🔒',
-        style: {
-          background: '#18181b',
-          color: '#fff',
-          border: '1px solid #3f3f46',
-        },
+        style: { background: '#18181b', color: '#fff', border: '1px solid #3f3f46' },
       });
       navigate('/login', { state: { from: '/booking', serviceId } });
     }
@@ -226,10 +243,7 @@ export default function Homepage() {
     setIsMobileMenuOpen(false);
     setTimeout(() => {
       if (ref.current) {
-        ref.current.scrollIntoView({
-          behavior: 'smooth',
-          block: 'start',
-        });
+        ref.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }
     }, 100);
   };
@@ -242,15 +256,14 @@ export default function Homepage() {
     if (!user) {
       toast('Please sign in to chat with us', {
         icon: '🔒',
-        style: {
-          background: '#18181b',
-          color: '#fff',
-          border: '1px solid #3f3f46',
-        },
+        style: { background: '#18181b', color: '#fff', border: '1px solid #3f3f46' },
       });
       navigate('/login', { state: { from: '/chat' } });
       return;
     }
+    
+    // 🚨 NEW: Clear unread count when user opens the chat
+    setUnreadCount(0);
     navigate('/chat');
   };
 
@@ -260,13 +273,8 @@ export default function Homepage() {
     return 0;
   };
 
-  const nextSlide = () => {
-    setCurrentSlide((prev) => (prev + 1) % heroSlides.length);
-  };
-
-  const prevSlide = () => {
-    setCurrentSlide((prev) => (prev - 1 + heroSlides.length) % heroSlides.length);
-  };
+  const nextSlide = () => setCurrentSlide((prev) => (prev + 1) % heroSlides.length);
+  const prevSlide = () => setCurrentSlide((prev) => (prev - 1 + heroSlides.length) % heroSlides.length);
 
   return (
     <div className="min-h-screen bg-white font-sans text-zinc-900">
@@ -287,76 +295,49 @@ export default function Homepage() {
               Mon - Sat: 8:00 AM - 6:00 PM
             </span>
           </div>
-          <div className="text-[10px] md:text-xs tracking-widest uppercase text-zinc-400">
-            Premium Auto Care
-          </div>
+          <div className="text-[10px] md:text-xs tracking-widest uppercase text-zinc-400">Premium Auto Care</div>
         </div>
       </div>
 
-      {/* Header */}
+      {/* Header (Truncated for brevity, keep your existing header code) */}
       <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-xl border-b border-zinc-200 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 md:px-6 py-3 md:py-4 flex justify-between items-center">
+         {/* ... (Keep existing Header code exactly as it was) ... */}
+         <div className="max-w-7xl mx-auto px-4 md:px-6 py-3 md:py-4 flex justify-between items-center">
           
-          <div
-            className="flex items-center gap-2 md:gap-3 cursor-pointer"
-            onClick={scrollToTop}
-            role="button"
-            aria-label="Go to homepage"
-          >
-            <img 
-              src="/logo.png" 
-              alt="Royal Service Center Logo" 
-              className="w-9 h-9 md:w-12 md:h-12 object-contain rounded-lg" 
-            />
+          <div className="flex items-center gap-2 md:gap-3 cursor-pointer" onClick={scrollToTop} role="button" aria-label="Go to homepage">
+            <img src="/logo.png" alt="Royal Service Center Logo" className="w-9 h-9 md:w-12 md:h-12 object-contain rounded-lg" />
             <div className="block">
-              <h1 className="text-lg md:text-xl font-black text-zinc-900 tracking-tight leading-none">
-                ROYAL
-              </h1>
-              <span className="text-[10px] md:text-xs font-bold text-red-600 tracking-widest">
-                SERVICE CENTER
-              </span>
+              <h1 className="text-lg md:text-xl font-black text-zinc-900 tracking-tight leading-none">ROYAL</h1>
+              <span className="text-[10px] md:text-xs font-bold text-red-600 tracking-widest">SERVICE CENTER</span>
             </div>
           </div>
 
-          {/* Desktop Nav */}
           <nav className="hidden lg:flex items-center space-x-8">
             <button onClick={scrollToTop} className="text-zinc-900 font-semibold text-sm tracking-wide hover:text-red-600 transition-colors relative group">
-              HOME
-              <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-red-600 group-hover:w-full transition-all duration-300"></span>
+              HOME <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-red-600 group-hover:w-full transition-all duration-300"></span>
             </button>
             <button onClick={scrollToAbout} className="text-zinc-600 font-semibold text-sm tracking-wide hover:text-red-600 transition-colors relative group">
-              ABOUT US
-              <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-red-600 group-hover:w-full transition-all duration-300"></span>
+              ABOUT US <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-red-600 group-hover:w-full transition-all duration-300"></span>
             </button>
             <button onClick={scrollToServices} className="text-zinc-600 font-semibold text-sm tracking-wide hover:text-red-600 transition-colors relative group">
-              OUR SERVICES
-              <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-red-600 group-hover:w-full transition-all duration-300"></span>
+              OUR SERVICES <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-red-600 group-hover:w-full transition-all duration-300"></span>
             </button>
             <button onClick={scrollToContact} className="text-zinc-600 font-semibold text-sm tracking-wide hover:text-red-600 transition-colors relative group">
-              CONTACT
-              <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-red-600 group-hover:w-full transition-all duration-300"></span>
+              CONTACT <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-red-600 group-hover:w-full transition-all duration-300"></span>
             </button>
             
-            {/* Show for all logged-in users in Nav */}
             {user && (
-              <button 
-                onClick={handleDashboardRedirect} 
-                className="text-zinc-600 font-semibold text-sm tracking-wide hover:text-red-600 transition-colors relative group"
-              >
+              <button onClick={handleDashboardRedirect} className="text-zinc-600 font-semibold text-sm tracking-wide hover:text-red-600 transition-colors relative group">
                 {user.role === 'customer' ? 'MY BOOKINGS' : 'DASHBOARD'}
                 <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-red-600 group-hover:w-full transition-all duration-300"></span>
               </button>
             )}
           </nav>
 
-          {/* Desktop Right Buttons */}
           <div className="hidden lg:flex items-center gap-4">
             {user ? (
               <div className="relative" ref={dropdownRef}>
-                <button
-                  onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                  className="w-10 h-10 rounded-full bg-zinc-100 border-2 border-zinc-200 flex items-center justify-center text-zinc-600 hover:border-red-600 transition-all overflow-hidden"
-                >
+                <button onClick={() => setIsDropdownOpen(!isDropdownOpen)} className="w-10 h-10 rounded-full bg-zinc-100 border-2 border-zinc-200 flex items-center justify-center text-zinc-600 hover:border-red-600 transition-all overflow-hidden">
                   {user?.avatar ? (
                     <img src={user.avatar} alt="Profile" className="w-full h-full object-cover" />
                   ) : (
@@ -374,9 +355,6 @@ export default function Homepage() {
                       </div>
                       <div className="py-2">
                         <button onClick={() => { setIsDropdownOpen(false); navigate('/profile'); }} className="block w-full text-left px-4 py-2.5 text-sm font-medium text-zinc-700 hover:text-red-600 hover:bg-zinc-50">Edit Profile</button>
-                        
-                        {/* 🚨 REMOVED DUPLICATE "MY BOOKINGS" / "DASHBOARD" FROM HERE */}
-                        
                         <div className="border-t border-zinc-100 my-1"></div>
                         <button onClick={handleLogout} className="block w-full text-left px-4 py-2.5 text-sm font-medium text-red-600 hover:bg-red-50">Logout</button>
                       </div>
@@ -386,9 +364,7 @@ export default function Homepage() {
               </div>
             ) : (
               <>
-                <Link to="/login" className="text-zinc-600 hover:text-red-600 text-sm font-bold tracking-wide transition-colors">
-                  LOGIN
-                </Link>
+                <Link to="/login" className="text-zinc-600 hover:text-red-600 text-sm font-bold tracking-wide transition-colors">LOGIN</Link>
                 <button onClick={() => handleBookNow()} className="bg-red-600 hover:bg-red-700 text-white px-6 py-3 rounded font-bold text-sm tracking-wide transition-all shadow-lg hover:shadow-xl flex items-center gap-2">
                   BOOK NOW
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" /></svg>
@@ -397,11 +373,7 @@ export default function Homepage() {
             )}
           </div>
 
-          {/* Mobile Hamburger Button */}
-          <button
-            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-            className="lg:hidden text-zinc-900 p-2 focus:outline-none"
-          >
+          <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="lg:hidden text-zinc-900 p-2 focus:outline-none">
             <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               {isMobileMenuOpen ? (
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
@@ -412,10 +384,10 @@ export default function Homepage() {
           </button>
         </div>
 
-        {/* Mobile Menu Dropdown */}
         {isMobileMenuOpen && (
           <div className="lg:hidden absolute top-full left-0 right-0 bg-white border-b border-zinc-200 shadow-xl overflow-y-auto max-h-[85vh]">
-            <div className="px-4 py-4 space-y-1">
+             {/* ... (Keep existing mobile menu code) ... */}
+             <div className="px-4 py-4 space-y-1">
               <button onClick={scrollToTop} className="block w-full text-left px-4 py-3 text-zinc-700 hover:text-red-600 hover:bg-zinc-50 rounded-lg font-medium">Home</button>
               <button onClick={scrollToAbout} className="block w-full text-left px-4 py-3 text-zinc-700 hover:text-red-600 hover:bg-zinc-50 rounded-lg font-medium">About Us</button>
               <button onClick={scrollToServices} className="block w-full text-left px-4 py-3 text-zinc-700 hover:text-red-600 hover:bg-zinc-50 rounded-lg font-medium">Our Services</button>
@@ -433,12 +405,9 @@ export default function Homepage() {
                 </>
               ) : (
                 <div className="pt-2 pb-2 space-y-3">
-                  <Link to="/login" onClick={() => setIsMobileMenuOpen(false)} className="block w-full text-center px-4 py-3 text-zinc-700 border border-zinc-300 rounded-lg font-bold hover:bg-zinc-50">
-                    LOGIN
-                  </Link>
+                  <Link to="/login" onClick={() => setIsMobileMenuOpen(false)} className="block w-full text-center px-4 py-3 text-zinc-700 border border-zinc-300 rounded-lg font-bold hover:bg-zinc-50">LOGIN</Link>
                   <button onClick={() => { setIsMobileMenuOpen(false); handleBookNow(); }} className="w-full bg-red-600 hover:bg-red-700 text-white px-4 py-3 rounded-lg font-bold flex justify-center items-center gap-2 shadow-lg">
-                    BOOK NOW
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" /></svg>
+                    BOOK NOW <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" /></svg>
                   </button>
                 </div>
               )}
@@ -447,58 +416,26 @@ export default function Homepage() {
         )}
       </header>
 
-      {/* Hero Carousel */}
+      {/* Hero Carousel (Truncated for brevity, keep your existing code) */}
+      {/* ... Keep your Hero Carousel section exactly as it was ... */}
       <section className="relative h-[75vh] md:h-[85vh] min-h-[500px] md:min-h-[600px] overflow-hidden">
         {heroSlides.map((slide, index) => (
-          <div
-            key={index}
-            className={`absolute inset-0 transition-opacity duration-1000 ${
-              index === currentSlide ? 'opacity-100 z-10' : 'opacity-0 z-0'
-            }`}
-          >
-            <div
-              className="absolute inset-0 bg-cover bg-center bg-no-repeat"
-              style={{ backgroundImage: `url('${slide.image}')` }}
-              aria-hidden="true"
-            />
+          <div key={index} className={`absolute inset-0 transition-opacity duration-1000 ${index === currentSlide ? 'opacity-100 z-10' : 'opacity-0 z-0'}`}>
+            <div className="absolute inset-0 bg-cover bg-center bg-no-repeat" style={{ backgroundImage: `url('${slide.image}')` }} aria-hidden="true" />
             <div className={`absolute inset-0 bg-gradient-to-r ${slide.overlay}`} />
-
             <div className="relative z-10 h-full flex items-center">
               <div className="max-w-7xl mx-auto px-4 md:px-6 w-full">
                 <div className="max-w-2xl">
-                  <div
-                    className={`transition-all duration-700 delay-300 ${
-                      index === currentSlide
-                        ? 'opacity-100 translate-y-0'
-                        : 'opacity-0 translate-y-8'
-                    }`}
-                  >
+                  <div className={`transition-all duration-700 delay-300 ${index === currentSlide ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
                     <div className="w-16 md:w-20 h-1 bg-red-600 mb-4 md:mb-6"></div>
-                    <h2 className="text-4xl md:text-7xl font-black text-white mb-3 md:mb-4 leading-tight tracking-tight uppercase">
-                      {slide.title}
-                    </h2>
-                    <p className="text-lg md:text-2xl text-zinc-300 mb-6 md:mb-8 font-light">
-                      {slide.subtitle}
-                    </p>
+                    <h2 className="text-4xl md:text-7xl font-black text-white mb-3 md:mb-4 leading-tight tracking-tight uppercase">{slide.title}</h2>
+                    <p className="text-lg md:text-2xl text-zinc-300 mb-6 md:mb-8 font-light">{slide.subtitle}</p>
                     <div className="flex flex-col sm:flex-row gap-3 md:gap-4">
-                      <button
-                        onClick={() => handleBookNow()}
-                        className="group inline-flex justify-center items-center gap-3 bg-red-600 hover:bg-red-700 text-white px-6 md:px-8 py-3 md:py-4 font-bold text-xs md:text-sm tracking-widest uppercase transition-all duration-300 shadow-xl"
-                      >
-                        {slide.cta}
-                        <svg className="w-4 h-4 md:w-5 md:h-5 transition-transform duration-300 group-hover:translate-x-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />
-                        </svg>
+                      <button onClick={() => handleBookNow()} className="group inline-flex justify-center items-center gap-3 bg-red-600 hover:bg-red-700 text-white px-6 md:px-8 py-3 md:py-4 font-bold text-xs md:text-sm tracking-widest uppercase transition-all duration-300 shadow-xl">
+                        {slide.cta} <svg className="w-4 h-4 md:w-5 md:h-5 transition-transform duration-300 group-hover:translate-x-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>
                       </button>
-
-                      <button
-                        onClick={scrollToServices}
-                        className="inline-flex justify-center items-center gap-3 border-2 border-white/70 hover:border-white hover:bg-white/10 text-white px-6 md:px-8 py-3 md:py-4 font-bold text-xs md:text-sm tracking-widest uppercase transition-all duration-300 backdrop-blur-sm"
-                      >
-                        VIEW SERVICES
-                        <svg className="w-4 h-4 md:w-5 md:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 14l-7 7m0 0l-7-7m7 7V3" />
-                        </svg>
+                      <button onClick={scrollToServices} className="inline-flex justify-center items-center gap-3 border-2 border-white/70 hover:border-white hover:bg-white/10 text-white px-6 md:px-8 py-3 md:py-4 font-bold text-xs md:text-sm tracking-widest uppercase transition-all duration-300 backdrop-blur-sm">
+                        VIEW SERVICES <svg className="w-4 h-4 md:w-5 md:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 14l-7 7m0 0l-7-7m7 7V3" /></svg>
                       </button>
                     </div>
                   </div>
@@ -507,22 +444,15 @@ export default function Homepage() {
             </div>
           </div>
         ))}
-
         <div className="absolute bottom-6 md:bottom-8 left-1/2 -translate-x-1/2 z-20 flex gap-2 md:gap-3">
           {heroSlides.map((_, index) => (
-            <button
-              key={index}
-              onClick={() => setCurrentSlide(index)}
-              className={`h-1 transition-all duration-500 ${
-                index === currentSlide ? 'w-10 md:w-12 bg-red-600' : 'w-5 md:w-6 bg-white/40 hover:bg-white/60'
-              }`}
-              aria-label={`Go to slide ${index + 1}`}
-            />
+            <button key={index} onClick={() => setCurrentSlide(index)} className={`h-1 transition-all duration-500 ${index === currentSlide ? 'w-10 md:w-12 bg-red-600' : 'w-5 md:w-6 bg-white/40 hover:bg-white/60'}`} aria-label={`Go to slide ${index + 1}`} />
           ))}
         </div>
       </section>
 
-      {/* Stats Section */}
+      {/* Stats Section (Truncated, keep existing code) */}
+      {/* ... Keep your Stats section exactly as it was ... */}
       <section ref={countersRef} className="py-16 md:py-20 bg-zinc-900 relative overflow-hidden">
         <div className="max-w-7xl mx-auto px-4 md:px-6 relative z-10">
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 md:gap-8">
@@ -531,9 +461,7 @@ export default function Homepage() {
                 <div className="text-3xl md:text-5xl font-black text-white mb-1 md:mb-2">
                   <Counter end={stat.value} suffix={stat.suffix} visible={countersVisible} delay={index * 200} />
                 </div>
-                <div className="text-red-500 font-bold text-[10px] md:text-sm tracking-widest uppercase mb-1">
-                  {stat.label}
-                </div>
+                <div className="text-red-500 font-bold text-[10px] md:text-sm tracking-widest uppercase mb-1">{stat.label}</div>
                 <div className="text-zinc-500 text-[10px] md:text-xs">{stat.description}</div>
               </div>
             ))}
@@ -541,29 +469,21 @@ export default function Homepage() {
         </div>
       </section>
 
-      {/* About Section */}
+      {/* About Section (Truncated, keep existing code) */}
+      {/* ... Keep your About section exactly as it was ... */}
       <section ref={aboutRef} className="py-16 md:py-24 bg-white scroll-mt-24">
         <div className="max-w-7xl mx-auto px-4 md:px-6">
           <div className="grid lg:grid-cols-2 gap-10 md:gap-16 items-center">
             <div>
               <div className="w-16 md:w-20 h-1 bg-red-600 mb-4 md:mb-6"></div>
-              <h3 className="text-3xl md:text-5xl font-black text-zinc-900 mb-4 md:mb-6 tracking-tight uppercase">
-                About Royal Service
-              </h3>
-              <p className="text-zinc-600 text-base md:text-lg mb-4 md:mb-6 leading-relaxed">
-                With over a decade of excellence in automotive care, we've built our reputation on trust, quality, and an unwavering commitment to our customers. From routine maintenance to complex repairs, our certified team treats every vehicle like a masterpiece.
-              </p>
-              <p className="text-zinc-600 text-base md:text-lg mb-8 md:mb-10 leading-relaxed">
-                Sri Lanka's premier automotive service provider — delivering excellence since 2009.
-              </p>
-
+              <h3 className="text-3xl md:text-5xl font-black text-zinc-900 mb-4 md:mb-6 tracking-tight uppercase">About Royal Service</h3>
+              <p className="text-zinc-600 text-base md:text-lg mb-4 md:mb-6 leading-relaxed">With over a decade of excellence in automotive care, we've built our reputation on trust, quality, and an unwavering commitment to our customers. From routine maintenance to complex repairs, our certified team treats every vehicle like a masterpiece.</p>
+              <p className="text-zinc-600 text-base md:text-lg mb-8 md:mb-10 leading-relaxed">Sri Lanka's premier automotive service provider — delivering excellence since 2009.</p>
               <div className="space-y-4 md:space-y-6">
                 {aboutFeatures.map((item, index) => (
                   <div key={index} className="flex gap-3 md:gap-4">
                     <div className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-red-50 flex items-center justify-center flex-shrink-0">
-                      <svg className="w-5 h-5 md:w-6 md:h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
-                      </svg>
+                      <svg className="w-5 h-5 md:w-6 md:h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" /></svg>
                     </div>
                     <div>
                       <h4 className="font-bold text-sm md:text-base text-zinc-900 mb-1">{item.title}</h4>
@@ -573,14 +493,9 @@ export default function Homepage() {
                 ))}
               </div>
             </div>
-
             <div className="relative mt-8 lg:mt-0">
               <div className="aspect-square rounded-2xl overflow-hidden shadow-2xl">
-                <img
-                  src="https://images.pexels.com/photos/3846228/pexels-photo-3846228.jpeg?auto=compress&cs=tinysrgb&w=1200"
-                  alt="Expert Sri Lankan mechanic"
-                  className="w-full h-full object-cover"
-                />
+                <img src="https://images.pexels.com/photos/3846228/pexels-photo-3846228.jpeg?auto=compress&cs=tinysrgb&w=1200" alt="Expert Sri Lankan mechanic" className="w-full h-full object-cover" />
               </div>
               <div className="absolute -bottom-6 -left-4 md:-bottom-8 md:-left-8 bg-red-600 text-white p-4 md:p-8 rounded-xl shadow-2xl max-w-[200px] md:max-w-xs">
                 <div className="text-4xl md:text-5xl font-black mb-1 md:mb-2">15+</div>
@@ -591,7 +506,8 @@ export default function Homepage() {
         </div>
       </section>
 
-      {/* Services Grid */}
+      {/* Services Grid (Truncated, keep existing code) */}
+      {/* ... Keep your Services Grid exactly as it was ... */}
       <section ref={servicesRef} className="py-16 md:py-24 bg-zinc-50 scroll-mt-24">
         <div className="max-w-7xl mx-auto px-4 md:px-6">
           <div className={`flex flex-col md:flex-row justify-between items-end mb-10 md:mb-16 transition-all duration-700 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
@@ -600,9 +516,7 @@ export default function Homepage() {
               <h3 className="text-3xl md:text-5xl font-black text-zinc-900 mb-2 md:mb-4 tracking-tight uppercase">Our Services</h3>
               <p className="text-zinc-600 max-w-xl text-sm md:text-lg">Transparent pricing. Uncompromising quality. Select your required service below.</p>
             </div>
-            {!loading && !error && (
-              <span className="text-xs md:text-sm text-zinc-500 font-semibold mt-4 md:mt-0">{services.length} SERVICES AVAILABLE</span>
-            )}
+            {!loading && !error && (<span className="text-xs md:text-sm text-zinc-500 font-semibold mt-4 md:mt-0">{services.length} SERVICES AVAILABLE</span>)}
           </div>
 
           {error && (
@@ -618,30 +532,14 @@ export default function Homepage() {
 
           {loading ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {[...Array(6)].map((_, index) => (
-                <div key={index} className="bg-white rounded-xl border border-zinc-200 overflow-hidden animate-pulse h-80"></div>
-              ))}
+              {[...Array(6)].map((_, index) => (<div key={index} className="bg-white rounded-xl border border-zinc-200 overflow-hidden animate-pulse h-80"></div>))}
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {services.map((service, index) => (
-                <div
-                  key={service._id}
-                  className={`group bg-white rounded-xl border border-zinc-200 hover:border-red-600 hover:shadow-2xl transition-all duration-500 overflow-hidden cursor-pointer flex flex-col h-full ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}
-                  style={{ transitionDelay: `${index * 100}ms` }}
-                  onClick={() => handleBookNow(service._id)}
-                  role="button"
-                  tabIndex={0}
-                  onKeyPress={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleBookNow(service._id); } }}
-                >
+                <div key={service._id} className={`group bg-white rounded-xl border border-zinc-200 hover:border-red-600 hover:shadow-2xl transition-all duration-500 overflow-hidden cursor-pointer flex flex-col h-full ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`} style={{ transitionDelay: `${index * 100}ms` }} onClick={() => handleBookNow(service._id)} role="button" tabIndex={0} onKeyPress={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleBookNow(service._id); } }}>
                   <div className="relative h-48 md:h-52 overflow-hidden bg-zinc-200">
-                    <img
-                      src={getServiceImage(service.name)}
-                      alt={service.name}
-                      className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
-                      loading="lazy"
-                      onError={(e) => { e.target.onerror = null; e.target.src = SERVICE_IMAGES.default; }}
-                    />
+                    <img src={getServiceImage(service.name)} alt={service.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" loading="lazy" onError={(e) => { e.target.onerror = null; e.target.src = SERVICE_IMAGES.default; }} />
                     <div className="absolute inset-0 bg-gradient-to-t from-zinc-900/80 via-zinc-900/20 to-transparent"></div>
                     <div className="absolute top-3 left-3 md:top-4 md:left-4">
                       <span className="inline-flex items-center gap-1.5 bg-red-600 text-white text-[9px] md:text-[10px] font-black tracking-widest uppercase px-2 md:px-3 py-1 md:py-1.5 rounded shadow-lg">
@@ -656,9 +554,7 @@ export default function Homepage() {
                     <p className="text-zinc-600 mb-4 md:mb-6 leading-relaxed text-xs md:text-sm line-clamp-3 flex-1">{service.description}</p>
                     <div className="pt-4 md:pt-5 border-t border-zinc-100 flex items-center justify-between">
                       <div>
-                        <span className="text-xl md:text-2xl font-black text-zinc-900 group-hover:text-red-600 transition-colors duration-300">
-                          LKR {getPrice(service).toLocaleString(undefined, { minimumFractionDigits: 0 })}
-                        </span>
+                        <span className="text-xl md:text-2xl font-black text-zinc-900 group-hover:text-red-600 transition-colors duration-300">LKR {getPrice(service).toLocaleString(undefined, { minimumFractionDigits: 0 })}</span>
                         <span className="block text-[10px] md:text-xs text-zinc-500 mt-1">Starting price</span>
                       </div>
                       <div className="w-9 h-9 md:w-11 md:h-11 rounded-full bg-zinc-100 flex items-center justify-center text-zinc-600 group-hover:bg-red-600 group-hover:text-white transition-all duration-300">
@@ -673,7 +569,8 @@ export default function Homepage() {
         </div>
       </section>
 
-      {/* Contact Section */}
+      {/* Contact Section (Truncated, keep existing code) */}
+      {/* ... Keep your Contact Section exactly as it was ... */}
       <section ref={contactRef} className="py-16 md:py-24 bg-zinc-900 scroll-mt-24 relative overflow-hidden">
         <div className="max-w-7xl mx-auto px-4 md:px-6 relative z-10">
           <div className="text-center mb-10 md:mb-16">
@@ -709,24 +606,20 @@ export default function Homepage() {
             </div>
           </div>
 
-          {/* Added Email Here */}
           <div className="text-center mb-10">
-            <p className="text-zinc-400 text-xs md:text-sm">
-              Or email us directly at: <a href="mailto:admin@royalservice.tech" className="text-red-500 font-bold hover:underline">admin@royalservice.tech</a>
-            </p>
+            <p className="text-zinc-400 text-xs md:text-sm">Or email us directly at: <a href="mailto:admin@royalservice.tech" className="text-red-500 font-bold hover:underline">admin@royalservice.tech</a></p>
           </div>
 
           <div className="text-center">
-            <button onClick={() => handleBookNow()} className="w-full md:w-auto bg-white text-red-600 px-8 md:px-10 py-3 md:py-4 rounded font-black text-sm md:text-base tracking-widest uppercase hover:bg-zinc-100 transition-all duration-300 shadow-xl">
-              Book an Appointment
-            </button>
+            <button onClick={() => handleBookNow()} className="w-full md:w-auto bg-white text-red-600 px-8 md:px-10 py-3 md:py-4 rounded font-black text-sm md:text-base tracking-widest uppercase hover:bg-zinc-100 transition-all duration-300 shadow-xl">Book an Appointment</button>
           </div>
         </div>
       </section>
 
-      {/* Footer */}
+      {/* Footer (Truncated, keep existing code) */}
+      {/* ... Keep your Footer exactly as it was ... */}
       <footer className="bg-zinc-950 pt-12 md:pt-16 pb-6 md:pb-8 border-t border-zinc-800">
-        <div className="max-w-7xl mx-auto px-4 md:px-6">
+         <div className="max-w-7xl mx-auto px-4 md:px-6">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8 md:gap-12 mb-8 md:mb-12">
             <div>
               <div className="flex items-center gap-2 mb-4 md:mb-6">
@@ -774,7 +667,7 @@ export default function Homepage() {
         </div>
       </footer>
 
-      {/* Floating Chat Button */}
+      {/* 🚨 FLOATING CHAT BUTTON WITH NOTIFICATION BADGE */}
       <button
         onClick={handleChatRedirect}
         className="fixed bottom-4 right-4 md:bottom-6 md:right-6 z-40 group"
@@ -788,7 +681,18 @@ export default function Homepage() {
             <svg className="w-3 h-3 md:w-4 md:h-4 text-white" fill="currentColor" viewBox="0 0 24 24">
               <path d="M12 3C6.477 3 2 6.94 2 11.79c0 2.7 1.44 5.11 3.72 6.74-.07.83-.33 2.25-1.05 3.15-.09.12-.01.3.14.31 1.18.08 2.87-.53 4.14-1.4.96.29 2 .45 3.05.45 5.523 0 10-3.94 10-8.79S17.523 3 12 3z" />
             </svg>
-            <span className="absolute -top-0.5 -right-0.5 w-2 h-2 md:w-2.5 md:h-2.5 rounded-full bg-emerald-400 border md:border-2 border-red-600"></span>
+            
+            {/* 🚨 NEW: Notification Badge / Unread Count */}
+            {unreadCount > 0 && (
+              <span className="absolute -top-1.5 -right-1.5 md:-top-2 md:-right-2 flex h-4 w-4 md:h-5 md:w-5 items-center justify-center rounded-full bg-red-500 text-[9px] md:text-[10px] font-bold text-white border-2 border-zinc-900 animate-bounce shadow-lg">
+                {unreadCount > 9 ? '9+' : unreadCount}
+              </span>
+            )}
+
+            {/* Online status dot (optional, will overlap if unread > 0, might want to hide it when unread > 0) */}
+            {unreadCount === 0 && (
+              <span className="absolute -top-0.5 -right-0.5 w-2 h-2 md:w-2.5 md:h-2.5 rounded-full bg-emerald-400 border md:border-2 border-red-600"></span>
+            )}
           </span>
           <span className="text-[10px] md:text-xs font-black tracking-widest uppercase whitespace-nowrap">Chat</span>
         </span>
