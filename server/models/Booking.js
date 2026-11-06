@@ -115,6 +115,12 @@ const BookingSchema = new mongoose.Schema({
   cancelled_at: {
     type: Date,
     default: null
+  },
+
+  // 🚨 NEW: Tracks if the 5-hour reminder email has been sent
+  reminder_sent: {
+    type: Boolean,
+    default: false
   }
   
 }, {

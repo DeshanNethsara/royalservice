@@ -17,6 +17,9 @@ import userRoutes from './routes/userRoutes.js';
 import serviceRoutes from './routes/serviceRoutes.js';
 import bookingRoutes from './routes/bookingRoutes.js';
 
+// 🚨 NEW: Import the reminder service
+import { startReminderService } from './utils/bookingReminder.js';
+
 const app = express();
 app.set('trust proxy', 1);
 const httpServer = createServer(app);
@@ -37,6 +40,9 @@ const io = new Server(httpServer, {
 });
 
 await connectDB();
+
+// 🚨 NEW: Start the cron job for 5-hour reminders
+startReminderService();
 
 const corsOptions = {
   origin: allowedOrigins,
@@ -116,7 +122,7 @@ io.on('connection', (socket) => {
 
       const contactsWithLastMessage = await Promise.all(
         contacts.map(async (contact) => {
-          // 🚨 FIX: Added 'text' to the select query
+          // Added 'text' to the select query
           const lastMessage = await Message.findOne({ threadId: String(contact._id) })
             .sort({ createdAt: -1 }).select('createdAt text');
 
@@ -124,7 +130,7 @@ io.on('connection', (socket) => {
             ...contact.toObject(),
             isOnline: onlineUsers.has(contact._id.toString()),
             lastMessageAt: lastMessage ? lastMessage.createdAt : null,
-            // 🚨 FIX: Send the text to the frontend so the sidebar can show a preview
+            // Send the text to the frontend so the sidebar can show a preview
             lastMessageText: lastMessage ? lastMessage.text : null 
           };
         })
