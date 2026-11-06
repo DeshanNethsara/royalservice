@@ -31,7 +31,7 @@ export default function ChatWidget() {
 
   const getUserId = useCallback(() => user?._id || user?.id, [user]);
 
-  // 🚨 FIX: Only block Admins. Allow both customers and staff.
+  // Only block Admins. Allow both customers and staff.
   if (!user || user.role === 'admin') return null;
 
   const quickCommands = [
@@ -92,7 +92,6 @@ export default function ChatWidget() {
       // If the widget is closed and message is from Admin/Bot, show notification
       if (!isOpen && String(newMessage.senderId) !== String(userId)) {
         setUnreadCount(prev => prev + 1);
-        // Optional: Play sound
         const audio = new Audio('/notification.mp3');
         audio.play().catch(() => {});
       }
@@ -102,7 +101,6 @@ export default function ChatWidget() {
     };
 
     const handleTyping = ({ threadId, userName }) => {
-      if (String(threadId) === String(userId) && String(userId) !== String(userId)) return; // Admin typing in customer thread
       if (String(threadId) === String(userId)) {
         setIsTyping(true);
         setTypingUser(userName);
@@ -261,14 +259,14 @@ export default function ChatWidget() {
           <div ref={messagesEndRef} />
         </div>
 
-        {/* Quick Commands */}
-        <div className="px-2 py-1 bg-white border-t border-zinc-100 shrink-0">
-          <div className="flex gap-2 overflow-x-auto hide-scrollbar py-1">
+        {/* Quick Commands - UPDATED TO WRAP */}
+        <div className="px-3 py-2 bg-white border-t border-zinc-100 shrink-0">
+          <div className="flex flex-wrap gap-2 max-h-[80px] overflow-y-auto hide-scrollbar">
             {quickCommands.map((cmd) => (
               <button
                 key={cmd.id}
                 onClick={() => handleQuickCommand(cmd)}
-                className="shrink-0 px-3 py-1 rounded-full text-xs font-bold bg-zinc-100 hover:bg-red-100 hover:text-red-600 text-zinc-600 transition-all border border-zinc-200"
+                className="px-3 py-1.5 rounded-full text-[11px] font-bold bg-zinc-100 hover:bg-red-100 hover:text-red-600 text-zinc-600 transition-all border border-zinc-200"
               >
                 {cmd.label}
               </button>
@@ -291,7 +289,10 @@ export default function ChatWidget() {
               disabled={!message.trim()}
               className="bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white w-10 h-10 rounded-xl flex items-center justify-center transition-colors shadow-md shrink-0"
             >
-              <svg className="w-4 h-4 ml-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 19l9 2-9-18-9 18-9-2 9-18 9 18-9-2z" /></svg>
+              {/* 🚨 FIXED: Clean Paper Plane Send Icon */}
+              <svg className="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+              </svg>
             </button>
           </form>
         </div>
