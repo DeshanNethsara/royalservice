@@ -525,7 +525,19 @@ export default function Homepage() {
               </div>
               <h4 className="text-white font-bold mb-2 tracking-wide text-sm uppercase">Chat With Us</h4>
               <p className="text-zinc-400 text-xs md:text-sm leading-relaxed mb-4">Instant support from our team</p>
-              <button onClick={() => user ? document.querySelector('.chat-widget-button')?.click() : toast('Please login to chat')} className="inline-flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white px-4 md:px-5 py-2 md:py-2.5 rounded font-bold text-[10px] md:text-xs tracking-widest uppercase transition-colors">Start Chat</button>
+              <button 
+                onClick={() => {
+                  if (!user) {
+                    toast('Please login to chat');
+                    navigate('/login');
+                  } else {
+                    navigate('/chat'); 
+                  }
+                }} 
+                className="inline-flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white px-4 md:px-5 py-2 md:py-2.5 rounded font-bold text-[10px] md:text-xs tracking-widest uppercase transition-colors"
+              >
+                Start Chat
+              </button>
             </div>
           </div>
 
@@ -589,7 +601,7 @@ export default function Homepage() {
         </div>
       </footer>
 
-      {/* 🚨 FIX: Always render the widget. Do not use {user && ...} */}
+      {/* 🚨 Always render the widget */}
       <ChatWidget />
 
     </div>
