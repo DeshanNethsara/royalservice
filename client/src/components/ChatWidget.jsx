@@ -31,7 +31,6 @@ export default function ChatWidget() {
 
   const getUserId = useCallback(() => user?._id || user?.id, [user]);
 
-  // Only block admins. Allow guests (null user) to see the button.
   const isUserLoggedIn = !!user && user.role !== 'admin';
 
   const quickCommands = [
@@ -91,7 +90,6 @@ export default function ChatWidget() {
     const handleIncomingMessage = (newMessage) => {
       if (String(newMessage.threadId) !== String(userId)) return;
       
-      // 🚨 FIX: Use functional update to read isOpen without adding it to dependencies
       setIsOpen((currentIsOpen) => {
         if (!currentIsOpen && String(newMessage.senderId) !== String(userId)) {
           setUnreadCount(prev => prev + 1);
@@ -133,7 +131,7 @@ export default function ChatWidget() {
       socket.off('stop_typing', handleStopTyping);
       socket.disconnect();
     };
-  }, [isUserLoggedIn, user, getUserId, addMessageIfNew]); // 🚨 FIXED: Removed `isOpen` from dependency array
+  }, [isUserLoggedIn, user, getUserId, addMessageIfNew]);
 
   useEffect(() => {
     if (isOpen && activeContact) {
@@ -198,12 +196,14 @@ export default function ChatWidget() {
   };
 
   return (
-    <div className="fixed bottom-6 right-6 z-[100] font-sans flex flex-col items-end pointer-events-none">
+    /* 🚨 FIXED CONTAINER: changed bottom-6 right-6 to bottom-0 right-0 on mobile, and added p-4 to give breathing room */
+    <div className="fixed bottom-0 right-0 md:bottom-6 md:right-6 z-[100] font-sans flex flex-col items-end pointer-events-none w-full md:w-auto p-4 md:p-0">
       
       {/* Chat Window */}
       {isUserLoggedIn && (
         <div 
-          className={`bg-white rounded-2xl shadow-2xl border border-zinc-200 w-[350px] md:w-[380px] overflow-hidden transition-all duration-300 transform origin-bottom-right flex flex-col pointer-events-auto mb-4 ${
+          /* 🚨 FIXED WIDTH: w-full for mobile, w-[380px] for desktop. max-w to prevent overflow */
+          className={`bg-white rounded-2xl shadow-2xl border border-zinc-200 w-full md:w-[380px] max-w-[100vw] overflow-hidden transition-all duration-300 transform origin-bottom-right flex flex-col pointer-events-auto mb-4 ${
             isOpen ? 'scale-100 opacity-100 h-[500px]' : 'scale-0 opacity-0 h-0 w-0 absolute bottom-16 right-0'
           }`}
         >
