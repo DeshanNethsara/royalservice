@@ -106,16 +106,16 @@ export default function Chat() {
       return await fetchRealPricing();
     }
     if (q.includes('cancel') || q.includes('cancellation')) {
-      return `❌ How to Cancel a Booking:\n\n1. Go to your Dashboard\n2. Navigate to "Upcoming" bookings\n3. Find the booking you want to cancel\n4. Click the "CANCEL" button\n5. Confirm your cancellation\n\n⚠️ Important: Cancellations must be made at least 2 hours before your appointment time.`;
+      return `❌ How to Cancel a Booking:\n\nGo to your Dashboard\n2. Navigate to "Upcoming" bookings\n3. Find the booking you want to cancel\n4. Click the "CANCEL" button\n5. Confirm your cancellation\n\n⚠️ Important: Cancellations must be made at least 2 hours before your appointment time.`;
     }
     if (/\b(book|booking|appointment|schedule)\b/.test(q)) {
-      return `📅 How to Book an Appointment:\n\n1. Click on "NEW BOOKING" button on the dashboard\n2. Select your vehicle type (Car, SUV, or Van)\n3. Choose the service you need\n4. Enter your vehicle details (Registration number, Make, Model, Year, Mileage)\n5. Select a convenient date and time slot\n6. Review your booking and confirm\n\n✅ Your booking will be confirmed instantly with a reference number.\n\nNote: You can book up to 7 days in advance.`;
+      return `📅 How to Book an Appointment:\n\nClick on "NEW BOOKING" button on the dashboard\n2. Select your vehicle type (Car, SUV, or Van)\n3. Choose the service you need\n4. Enter your vehicle details (Registration number, Make, Model, Year, Mileage)\n5. Select a convenient date and time slot\n6. Review your booking and confirm\n\n✅ Your booking will be confirmed instantly with a reference number.\n\nNote: You can book up to 7 days in advance.`;
     }
     if (q.includes('contact') || q.includes('phone') || q.includes('number') || q.includes('call')) {
       return `📞 Our Contact Information:\n\nPhone: +94 74 365 8500\nEmail: admin@royalservice.tech\n\nOur support team is available during operating hours.`;
     }
     if (q.includes('service') || q.includes('offer') || q.includes('provide')) {
-      return `🔧 Our Services:\n\n1. Full Service\n2. Oil Change\n3. Brake Service\n4. AC Service\n5. Tire Service\n6. Engine Diagnostics\n7. Battery Service\n8. Wash & Detailing\n\nPrices vary based on vehicle type.`;
+      return `🔧 Our Services:\n\nFull Service\n2. Oil Change\n3. Brake Service\n4. AC Service\n5. Tire Service\n6. Engine Diagnostics\n7. Battery Service\n8. Wash & Detailing\n\nPrices vary based on vehicle type.`;
     }
     if (q.includes('hour') || q.includes('open') || q.includes('time') || q.includes('close')) {
       return `🕒 Operating Hours:\n\nMonday - Friday: 8:00 AM - 6:00 PM\nSaturday: 9:00 AM - 4:00 PM\nSunday: Closed\n\nLast booking slot is at 3:30 PM.`;
@@ -289,12 +289,21 @@ export default function Chat() {
     const handleAllChatsCleared = () => {
       setMessages([]);
       setContacts(prev => prev.map(c => ({ ...c, lastMessageText: null, lastMessageAt: null })));
-      setUnreadCounts({}); // 🚨 Clear all unread counts
+      setUnreadCounts({}); 
       toast.success('All chats have been cleared');
     };
 
     const handleClearAllError = (msg) => {
       toast.error(msg || 'Failed to clear all chats');
+    };
+
+    // 🚨 ADD THIS EVENT LISTENER
+    const handleChatRead = ({ threadId }) => {
+      setUnreadCounts(prev => {
+        const updated = { ...prev };
+        delete updated[threadId];
+        return updated;
+      });
     };
 
     socket.on('contacts_list', handleContactsList);
@@ -310,6 +319,7 @@ export default function Chat() {
     socket.on('stop_typing', handleStopTyping);
     socket.on('all_chats_cleared', handleAllChatsCleared);
     socket.on('clear_all_chats_error', handleClearAllError);
+    socket.on('chat_read', handleChatRead); // 🚨 LISTEN FOR THE EVENT
 
     return () => {
       socket.off('contacts_list', handleContactsList);
@@ -325,19 +335,18 @@ export default function Chat() {
       socket.off('stop_typing', handleStopTyping);
       socket.off('all_chats_cleared', handleAllChatsCleared);
       socket.off('clear_all_chats_error', handleClearAllError);
+      socket.off('chat_read', handleChatRead); // 🚨 CLEAN IT UP
       if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
       socket.disconnect();
     };
   }, [user, navigate, getUserId, addMessageIfNew]);
 
-  // 🚨 NEW: This only runs when you explicitly click a contact
   const handleOpenChat = (contact) => {
     setActiveContact(contact);
     activeThreadRef.current = contact._id;
     
     socket.emit('fetch_history', contact._id);
     
-    // Only clear badge if there are unread messages
     if (unreadCounts[contact._id] > 0) {
       socket.emit('mark_read', { threadId: contact._id, userId: getUserId() });
       setUnreadCounts(prev => {
@@ -383,7 +392,7 @@ export default function Chat() {
       setTimeout(() => {
         socket.emit('send_message', {
           senderId: 'bot', senderName: 'Royal Service Center', senderRole: 'bot', threadId: userId,
-          text: `Thank you for your message! I'll help you with that.\n\nYou can also use these quick commands:\n- Ask about booking appointments\n- Inquire about our services\n- Get our contact number\n- Check operating hours\n\nFor immediate assistance, call us at +94 74 365 8500 or email admin@royalservice.tech.`
+          text: `Thank you for your message! I'll help you with that.\n\nYou can also use these quick commands:\nAsk about booking appointments\nInquire about our services\nGet our contact number\nCheck operating hours\n\nFor immediate assistance, call us at +94 74 365 8500 or email admin@royalservice.tech.`
         });
       }, 1000);
     }
@@ -523,7 +532,7 @@ export default function Chat() {
                   return (
                     <div
                       key={contact._id}
-                      onClick={() => handleOpenChat(contact)} // 🚨 USE handleOpenChat
+                      onClick={() => handleOpenChat(contact)} 
                       onContextMenu={(e) => handleContextMenu(e, contact)}
                       className={`p-3 rounded-xl cursor-pointer transition-all border relative ${
                         activeContact?._id === contact._id ? 'bg-red-600/10 border-red-600/40' : 'bg-zinc-950/60 border-zinc-800 hover:bg-zinc-800/50'
@@ -575,7 +584,12 @@ export default function Chat() {
                 
                 {user?.role === 'admin' && (
                   <button
-                    onClick={() => setIsMobileChatOpen(false)}
+                    onClick={() => {
+                      setIsMobileChatOpen(false);
+                      // 🚨 ALSO FORGET THE ACTIVE THREAD HERE
+                      setActiveContact(null);
+                      activeThreadRef.current = null;
+                    }}
                     className="md:hidden text-zinc-400 hover:text-white p-1 mr-1"
                   >
                     <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">

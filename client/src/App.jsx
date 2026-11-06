@@ -10,14 +10,16 @@ import CustomerDashboard from './pages/CustomerDashboard';
 import AdminPanel from './pages/AdminPanel';
 import StaffDashboard from './pages/StaffDashboard';
 import Profile from './pages/Profile';
-// 1. Add this import line:
 import Chat from './pages/Chat'; 
+
+// 🚨 Optional: Import ChatWidget here if you want it on every page
+import ChatWidget from './components/ChatWidget';
 
 export default function App() {
   return (
     <AuthProvider>
       <BrowserRouter>
-        <Toaster /* ... toast settings remain unchanged ... */ />
+        <Toaster />
 
         <Routes>
           <Route path="/" element={<Homepage />} />
@@ -27,10 +29,12 @@ export default function App() {
           <Route path="/admin" element={<AdminPanel />} />
           <Route path="/staff" element={<StaffDashboard />} />
           <Route path="/profile" element={<Profile />} />
-          
-          {/* 2. Add this route line: */}
           <Route path="/chat" element={<Chat />} />
         </Routes>
+
+        {/* 🚨 Place it here, outside Routes but inside BrowserRouter, so it floats globally! */}
+        {/* <ChatWidget /> */}
+        
       </BrowserRouter>
     </AuthProvider>
   );

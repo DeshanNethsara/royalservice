@@ -28,10 +28,14 @@ export default function ChatWidget() {
   const messagesContainerRef = useRef(null);
   const typingTimeoutRef = useRef(null);
   const hasSentFirstMessageRef = useRef(false);
+  
+  // 🚨 FIX: Track if the widget is open synchronously for socket events
+  const isOpenRef = useRef(isOpen);
+  useEffect(() => {
+    isOpenRef.current = isOpen;
+  }, [isOpen]);
 
   const getUserId = useCallback(() => user?._id || user?.id, [user]);
-
-  // 🚨 FIX: Allow Admins to connect so they receive notifications
   const isUserLoggedIn = !!user;
 
   const quickCommands = [
@@ -91,27 +95,24 @@ export default function ChatWidget() {
     };
 
     const handleIncomingMessage = (newMessage) => {
-      // For customers, only process messages for their own thread
       if (user.role !== 'admin' && String(newMessage.threadId) !== String(userId)) return;
       
-      // 🚨 FIX: Play sound and show badge if sender is not the current user
+      // If someone else sent a message to us
       if (String(newMessage.senderId) !== String(userId)) {
-        setIsOpen((currentIsOpen) => {
-          if (!currentIsOpen) {
-            setUnreadCount(prev => prev + 1);
-            const audio = new Audio('/notification.mp3');
-            audio.play().catch(() => {});
-          }
-          return currentIsOpen;
-        });
+        if (!isOpenRef.current) {
+          // Widget is closed: Increase badge and play sound
+          setUnreadCount(prev => prev + 1);
+          const audio = new Audio('/notification.mp3');
+          audio.play().catch(() => {});
+        } else {
+          // Widget is open: Mark as read immediately
+          socket.emit('mark_read', { threadId: newMessage.threadId, userId });
+        }
       }
 
-      // Only add to messages if this is a customer thread
       if (user.role !== 'admin') {
         addMessageIfNew(newMessage);
       }
-      
-      socket.emit('mark_read', { threadId: newMessage.threadId, userId });
     };
 
     const handleTyping = ({ threadId, userName }) => {
@@ -144,14 +145,22 @@ export default function ChatWidget() {
     };
   }, [isUserLoggedIn, user, getUserId, addMessageIfNew]);
 
+  // 🚨 FIX: Trigger mark_read when the user opens the widget
   useEffect(() => {
     if (isOpen && activeContact && user?.role !== 'admin') {
       activeThreadRef.current = activeContact._id;
+      
+      // Tell backend to clear the unread badge
+      socket.emit('mark_read', { threadId: activeContact._id, userId: getUserId() });
       socket.emit('fetch_history', activeContact._id);
+      
       setUnreadCount(0);
       setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
+    } else if (!isOpen) {
+      // Forget active thread when closed
+      activeThreadRef.current = null;
     }
-  }, [isOpen, activeContact, user?.role]);
+  }, [isOpen, activeContact, user?.role, getUserId]);
 
   useEffect(() => {
     if (isOpen) messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -314,7 +323,6 @@ export default function ChatWidget() {
               navigate('/login');
               return;
             }
-            // 🚨 If Admin, redirect to the full chat page
             if (user.role === 'admin') {
               navigate('/chat');
               return;

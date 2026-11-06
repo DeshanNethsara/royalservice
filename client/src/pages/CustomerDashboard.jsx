@@ -3,7 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 import axiosClient from '../api/axiosClient';
 import toast from 'react-hot-toast';
-import ChatWidget from '../components/ChatWidget'; // 🚨 NEW: Import the widget
+import ChatWidget from '../components/ChatWidget';
 
 export default function CustomerDashboard() {
   const { user, logout } = useContext(AuthContext);
@@ -571,7 +571,6 @@ export default function CustomerDashboard() {
         </div>
       </main>
 
-      {/* 🚨 NEW: Floating Chat Widget */}
       <ChatWidget />
 
       <style dangerouslySetInnerHTML={{__html: `

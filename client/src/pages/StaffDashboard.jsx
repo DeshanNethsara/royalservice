@@ -3,7 +3,6 @@ import { useNavigate, Link } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 import axiosClient from '../api/axiosClient';
 import toast from 'react-hot-toast';
-// 🚨 NEW: Import the Chat Widget
 import ChatWidget from '../components/ChatWidget';
 
 export default function StaffDashboard() {
@@ -323,7 +322,6 @@ export default function StaffDashboard() {
         )}
       </div>
 
-      {/* 🚨 NEW: Floating Chat Widget for Staff */}
       <ChatWidget />
 
     </div>
