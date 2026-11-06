@@ -1,9 +1,9 @@
 import React, { useState, useContext, useEffect, useRef, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom'; // 🚨 Import useNavigate
+import { useNavigate } from 'react-router-dom'; 
 import { AuthContext } from '../context/AuthContext';
 import axiosClient from '../api/axiosClient';
 import io from 'socket.io-client';
-import toast from 'react-hot-toast'; // 🚨 Import toast for login prompt
+import toast from 'react-hot-toast'; 
 
 const SOCKET_URL = import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5000';
 const socket = io(SOCKET_URL, {
@@ -13,7 +13,7 @@ const socket = io(SOCKET_URL, {
 
 export default function ChatWidget() {
   const { user } = useContext(AuthContext);
-  const navigate = useNavigate(); // 🚨 Initialize navigate
+  const navigate = useNavigate(); 
   
   const [isOpen, setIsOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -31,7 +31,7 @@ export default function ChatWidget() {
 
   const getUserId = useCallback(() => user?._id || user?.id, [user]);
 
-  // 🚨 FIX: Only block admins. Allow guests (null user) to see the button.
+  // Only block admins. Allow guests (null user) to see the button.
   const isUserLoggedIn = !!user && user.role !== 'admin';
 
   const quickCommands = [
@@ -73,7 +73,7 @@ export default function ChatWidget() {
   }, []);
 
   useEffect(() => {
-    if (!isUserLoggedIn) return; // Don't connect socket if not logged in
+    if (!isUserLoggedIn) return; 
 
     const userId = getUserId();
     socket.connect();
@@ -91,11 +91,15 @@ export default function ChatWidget() {
     const handleIncomingMessage = (newMessage) => {
       if (String(newMessage.threadId) !== String(userId)) return;
       
-      if (!isOpen && String(newMessage.senderId) !== String(userId)) {
-        setUnreadCount(prev => prev + 1);
-        const audio = new Audio('/notification.mp3');
-        audio.play().catch(() => {});
-      }
+      // 🚨 FIX: Use functional update to read isOpen without adding it to dependencies
+      setIsOpen((currentIsOpen) => {
+        if (!currentIsOpen && String(newMessage.senderId) !== String(userId)) {
+          setUnreadCount(prev => prev + 1);
+          const audio = new Audio('/notification.mp3');
+          audio.play().catch(() => {});
+        }
+        return currentIsOpen;
+      });
 
       addMessageIfNew(newMessage);
       socket.emit('mark_read', { threadId: newMessage.threadId, userId });
@@ -129,7 +133,7 @@ export default function ChatWidget() {
       socket.off('stop_typing', handleStopTyping);
       socket.disconnect();
     };
-  }, [isUserLoggedIn, user, isOpen, getUserId, addMessageIfNew]);
+  }, [isUserLoggedIn, user, getUserId, addMessageIfNew]); // 🚨 FIXED: Removed `isOpen` from dependency array
 
   useEffect(() => {
     if (isOpen && activeContact) {
@@ -196,7 +200,7 @@ export default function ChatWidget() {
   return (
     <div className="fixed bottom-6 right-6 z-[100] font-sans flex flex-col items-end pointer-events-none">
       
-      {/* 🚨 FIX: Only render chat window if user is logged in AND widget is open */}
+      {/* Chat Window */}
       {isUserLoggedIn && (
         <div 
           className={`bg-white rounded-2xl shadow-2xl border border-zinc-200 w-[350px] md:w-[380px] overflow-hidden transition-all duration-300 transform origin-bottom-right flex flex-col pointer-events-auto mb-4 ${
@@ -292,12 +296,11 @@ export default function ChatWidget() {
         </div>
       )}
 
-      {/* Floating Button - 🚨 ALWAYS VISIBLE (except for admins) */}
+      {/* Floating Button */}
       {!isOpen && user?.role !== 'admin' && (
         <button
           onClick={() => {
             if (!user) {
-              // 🚨 Show a toast and redirect to login
               toast.error('Please log in to chat with our support team.');
               navigate('/login');
               return;
