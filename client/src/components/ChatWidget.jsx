@@ -31,8 +31,8 @@ export default function ChatWidget() {
 
   const getUserId = useCallback(() => user?._id || user?.id, [user]);
 
-  // 🚨 FIX: Allow customers and staff to use the popup widget. Admins will be redirected.
-  const isUserLoggedIn = !!user && user.role !== 'admin';
+  // 🚨 FIX: Allow Admins to connect so they receive notifications
+  const isUserLoggedIn = !!user;
 
   const quickCommands = [
     { id: 'booking', label: '📅 How to Book', question: 'How do I book an appointment?' },
@@ -80,7 +80,9 @@ export default function ChatWidget() {
 
     socket.on('connect', () => {
       socket.emit('user_connected', { userId, role: user.role });
-      setActiveContact({ _id: userId, name: 'Royal Support', role: 'admin' });
+      if (user.role !== 'admin') {
+        setActiveContact({ _id: userId, name: 'Royal Support', role: 'admin' });
+      }
     });
 
     const handleChatHistory = (history) => {
@@ -89,30 +91,38 @@ export default function ChatWidget() {
     };
 
     const handleIncomingMessage = (newMessage) => {
-      if (String(newMessage.threadId) !== String(userId)) return;
+      // For customers, only process messages for their own thread
+      if (user.role !== 'admin' && String(newMessage.threadId) !== String(userId)) return;
       
-      setIsOpen((currentIsOpen) => {
-        if (!currentIsOpen && String(newMessage.senderId) !== String(userId)) {
-          setUnreadCount(prev => prev + 1);
-          const audio = new Audio('/notification.mp3');
-          audio.play().catch(() => {});
-        }
-        return currentIsOpen;
-      });
+      // 🚨 FIX: Play sound and show badge if sender is not the current user
+      if (String(newMessage.senderId) !== String(userId)) {
+        setIsOpen((currentIsOpen) => {
+          if (!currentIsOpen) {
+            setUnreadCount(prev => prev + 1);
+            const audio = new Audio('/notification.mp3');
+            audio.play().catch(() => {});
+          }
+          return currentIsOpen;
+        });
+      }
 
-      addMessageIfNew(newMessage);
+      // Only add to messages if this is a customer thread
+      if (user.role !== 'admin') {
+        addMessageIfNew(newMessage);
+      }
+      
       socket.emit('mark_read', { threadId: newMessage.threadId, userId });
     };
 
     const handleTyping = ({ threadId, userName }) => {
-      if (String(threadId) === String(userId)) {
+      if (user.role !== 'admin' && String(threadId) === String(userId)) {
         setIsTyping(true);
         setTypingUser(userName);
       }
     };
 
     const handleStopTyping = ({ threadId }) => {
-      if (String(threadId) === String(userId)) {
+      if (user.role !== 'admin' && String(threadId) === String(userId)) {
         setIsTyping(false);
         setTypingUser('');
       }
@@ -135,13 +145,13 @@ export default function ChatWidget() {
   }, [isUserLoggedIn, user, getUserId, addMessageIfNew]);
 
   useEffect(() => {
-    if (isOpen && activeContact) {
+    if (isOpen && activeContact && user?.role !== 'admin') {
       activeThreadRef.current = activeContact._id;
       socket.emit('fetch_history', activeContact._id);
       setUnreadCount(0);
       setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
     }
-  }, [isOpen, activeContact]);
+  }, [isOpen, activeContact, user?.role]);
 
   useEffect(() => {
     if (isOpen) messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -163,7 +173,7 @@ export default function ChatWidget() {
     setMessage('');
     socket.emit('stop_typing', { threadId: activeContact._id, userId });
 
-    if (!hasSentFirstMessageRef.current) {
+    if (user.role !== 'admin' && !hasSentFirstMessageRef.current) {
       hasSentFirstMessageRef.current = true;
       setTimeout(() => {
         socket.emit('send_message', {
@@ -175,7 +185,7 @@ export default function ChatWidget() {
   };
 
   const handleQuickCommand = async (cmd) => {
-    if (!activeContact) return;
+    if (!activeContact || user?.role === 'admin') return;
     const userId = getUserId();
     
     socket.emit('send_message', { senderId: userId, senderName: user.name, senderRole: user.role, threadId: userId, text: cmd.question });
@@ -188,7 +198,7 @@ export default function ChatWidget() {
 
   const handleInputChange = (e) => {
     setMessage(e.target.value);
-    if (!activeContact) return;
+    if (!activeContact || user?.role === 'admin') return;
     socket.emit('typing', { threadId: activeContact._id, userId: getUserId(), userName: user.name });
     if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
     typingTimeoutRef.current = setTimeout(() => {
@@ -200,7 +210,7 @@ export default function ChatWidget() {
     <div className="fixed bottom-0 right-0 md:bottom-6 md:right-6 z-[100] font-sans flex flex-col items-end pointer-events-none w-full md:w-auto p-4 md:p-0">
       
       {/* Chat Window (Only for Customers/Staff) */}
-      {isUserLoggedIn && (
+      {isUserLoggedIn && user.role !== 'admin' && (
         <div 
           className={`bg-white rounded-2xl shadow-2xl border border-zinc-200 w-full md:w-[380px] max-w-[100vw] overflow-hidden transition-all duration-300 transform origin-bottom-right flex flex-col pointer-events-auto mb-4 ${
             isOpen ? 'scale-100 opacity-100 h-[500px]' : 'scale-0 opacity-0 h-0 w-0 absolute bottom-16 right-0'
@@ -304,7 +314,7 @@ export default function ChatWidget() {
               navigate('/login');
               return;
             }
-            // 🚨 NEW: If Admin, redirect to the full chat page
+            // 🚨 If Admin, redirect to the full chat page
             if (user.role === 'admin') {
               navigate('/chat');
               return;
