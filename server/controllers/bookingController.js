@@ -157,7 +157,13 @@ const buildServiceRecordPDF = (booking, report, payment) => {
     ]);
     
     y += cardH + 15;
-    drawInfoCard(M, y, 'SERVICE PERFORMED', [service?.name || 'N/A', service?.description ? service.description.slice(0, 90) + '...' : 'General service', `Duration: ${service?.duration_minutes ? service.duration_minutes + ' min' : 'N/A'}`]);
+    
+    // 🚨 UPDATED: Removed Duration line
+    drawInfoCard(M, y, 'SERVICE PERFORMED', [
+      service?.name || 'N/A', 
+      service?.description ? service.description.slice(0, 90) + '...' : 'General service'
+    ]);
+    
     drawInfoCard(M + cardW + 20, y, 'SCHEDULE', [formatDate(booking.booking_date), `Time Slot: ${booking.booking_time || 'N/A'}`, `Completed: ${formatDate(booking.completed_at || report.created_at)}`]);
     y += cardH + 30;
 
