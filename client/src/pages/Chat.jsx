@@ -25,7 +25,7 @@ export default function Chat() {
   const [unreadCounts, setUnreadCounts] = useState({});
   const [contextMenu, setContextMenu] = useState(null);
   
-  // 🚨 NEW: Track the ID of the first unread message to render a separator
+  // Track the ID of the first unread message to render a separator
   const [firstUnreadId, setFirstUnreadId] = useState(null);
 
   // Mobile view state
@@ -36,8 +36,8 @@ export default function Chat() {
   const messagesContainerRef = useRef(null);
   const typingTimeoutRef = useRef(null);
   const hasSentFirstMessageRef = useRef(false);
-  const firstUnreadRef = useRef(null); // Ref for scrolling to the unread separator
-  const markReadTimeoutRef = useRef(null); // Ref for the delayed read timer
+  const firstUnreadRef = useRef(null); 
+  const markReadTimeoutRef = useRef(null); 
 
   const getUserId = useCallback(() => user?._id || user?.id, [user]);
 
@@ -179,7 +179,6 @@ export default function Chat() {
       });
     };
     
-    // 🚨 WHATSAPP FIX 1: When history loads, find the first unread message to scroll to
     const handleChatHistory = (history) => {
       const sortedHistory = history || [];
       setMessages(sortedHistory);
@@ -225,17 +224,16 @@ export default function Chat() {
       if (String(newMessage.threadId) === String(activeThreadRef.current)) {
         addMessageIfNew(newMessage);
         
-        // If we are looking at the chat, scroll to bottom for THIS specific new message
+        // Scroll to bottom for THIS specific new message
         setTimeout(() => {
           messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
         }, 100);
 
-        // Clear existing timer and restart it to mark as read
         if (markReadTimeoutRef.current) clearTimeout(markReadTimeoutRef.current);
         markReadTimeoutRef.current = setTimeout(() => {
           socket.emit('mark_read', { threadId: newMessage.threadId, userId });
-          setFirstUnreadId(null); // Remove the divider
-        }, 3000); // 3 seconds delay before marking as read
+          setFirstUnreadId(null); 
+        }, 3000); 
         
       } else if (user.role === 'admin') {
         toast.success(`New message from ${newMessage.senderName}`);
@@ -329,18 +327,15 @@ export default function Chat() {
     };
   }, [user, navigate, getUserId, addMessageIfNew]);
 
-  // 🚨 WHATSAPP FIX 2: Delay marking as read when opening a chat
   const handleOpenChat = (contact) => {
     setActiveContact(contact);
     activeThreadRef.current = contact._id;
     
-    // Clear any existing timer
     if (markReadTimeoutRef.current) clearTimeout(markReadTimeoutRef.current);
     
     socket.emit('fetch_history', contact._id);
     
     if (unreadCounts[contact._id] > 0) {
-      // Wait 5 seconds before confirming the user has "read" it, just like a read receipt delay
       markReadTimeoutRef.current = setTimeout(() => {
         socket.emit('mark_read', { threadId: contact._id, userId: getUserId() });
         setUnreadCounts(prev => {
@@ -348,8 +343,8 @@ export default function Chat() {
           delete updated[contact._id];
           return updated;
         });
-        setFirstUnreadId(null); // Remove the visual divider
-      }, 5000); // 5 seconds
+        setFirstUnreadId(null); 
+      }, 5000); 
     }
 
     setIsMobileChatOpen(true);
@@ -393,7 +388,6 @@ export default function Chat() {
       });
     }
 
-    // Scroll to bottom immediately upon sending a message
     setTimeout(() => {
       messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, 100);
