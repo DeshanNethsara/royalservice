@@ -364,7 +364,7 @@ export default function Chat() {
   }, []);
 
   const handleSendMessage = (e) => {
-    e.preventDefault();
+    if (e) e.preventDefault();
     if (!message.trim() || !activeContact || !user) return;
 
     const userId = getUserId();
@@ -742,17 +742,19 @@ export default function Chat() {
           )}
 
           <div className="p-3 md:p-4 bg-zinc-950/50 border-t border-zinc-800 backdrop-blur-xl shrink-0">
-            <form onSubmit={handleSendMessage} className="flex gap-2 md:gap-3">
+            {/* 🚨 FIX: Changed <form> to <div> to stop Gboard autofill bugs */}
+            <div className="flex gap-2 md:gap-3">
               <input
                 type="text"
-                name="chatMessageDesktop"
-                autoComplete="off"
+                name="adminChatMsgRandom"
+                autoComplete="nope" // Forces Chrome/Gboard to abandon autofill guesses
+                data-lpignore="true" // Bypasses password managers
                 value={message}
                 onChange={handleInputChange}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' && !e.shiftKey) {
                     e.preventDefault();
-                    handleSendMessage(e);
+                    handleSendMessage(e); // Pass event to handleSendMessage
                   }
                 }}
                 disabled={!activeContact}
@@ -760,7 +762,8 @@ export default function Chat() {
                 className="flex-1 min-w-0 bg-zinc-900 border border-zinc-800 text-white px-4 md:px-5 py-3 md:py-3.5 rounded-xl focus:border-red-600 focus:outline-none transition-colors disabled:opacity-50 text-sm md:text-base placeholder:text-zinc-600"
               />
               <button
-                type="submit"
+                type="button" // Changed from submit to button
+                onClick={handleSendMessage} // Trigger send manually
                 disabled={!message.trim() || !activeContact}
                 className="bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white px-4 md:px-6 rounded-xl font-black tracking-widest transition-all text-sm md:text-base flex items-center justify-center shadow-lg shadow-red-600/20 shrink-0"
               >
@@ -769,7 +772,7 @@ export default function Chat() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
                 </svg>
               </button>
-            </form>
+            </div>
           </div>
         </section>
       </main>

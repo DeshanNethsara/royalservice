@@ -110,7 +110,7 @@ export default function ChatWidget() {
       const firstUnread = sortedHistory.find(m => String(m.senderId) !== String(userId) && !m.isRead);
       if (firstUnread) {
         setFirstUnreadId(firstUnread._id);
-        // Wait 350ms for the CSS widget-open animation to finish before scrolling
+        // Wait 350ms for the CSS widget-open animation (duration-300) to finish before scrolling
         setTimeout(() => {
           firstUnreadRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
         }, 350); 
@@ -173,6 +173,7 @@ export default function ChatWidget() {
     };
   }, [isUserLoggedIn, user, getUserId, addMessageIfNew, scrollToBottom]);
 
+  // Handle widget opening
   useEffect(() => {
     if (isOpen && activeContact && user?.role !== 'admin') {
       activeThreadRef.current = activeContact._id;
@@ -191,6 +192,7 @@ export default function ChatWidget() {
     }
   }, [isOpen, activeContact, user?.role, getUserId]);
 
+  // Universal Scroll Watcher - Auto-scroll on new messages/typing if NO unread divider is active
   useEffect(() => {
     if (isOpen && !firstUnreadId) {
       setTimeout(() => scrollToBottom(true), 150);
@@ -198,7 +200,7 @@ export default function ChatWidget() {
   }, [messages, isTyping, isOpen, firstUnreadId, scrollToBottom]);
 
   const handleSendMessage = (e) => {
-    e.preventDefault();
+    if (e) e.preventDefault();
     if (!message.trim() || !activeContact) return;
 
     const userId = getUserId();
@@ -215,6 +217,8 @@ export default function ChatWidget() {
     };
     
     addMessageIfNew(outgoingMsg);
+    
+    // Force instant scroll when user sends a message
     setTimeout(() => scrollToBottom(true), 50);
 
     socket.emit('send_message', {
@@ -372,18 +376,27 @@ export default function ChatWidget() {
 
           {/* Input Area */}
           <div className="p-3 bg-white border-t border-zinc-100 shrink-0">
-            <form onSubmit={handleSendMessage} className="flex gap-2">
+            {/* 🚨 FIX: Changed <form> to <div> to stop Gboard autofill bugs */}
+            <div className="flex gap-2">
               <input
                 type="text"
-                name="chatMessageWidget"
-                autoComplete="off"
+                name="chatMsgRandom"
+                autoComplete="nope" // Forces Chrome/Gboard to abandon autofill guesses
+                data-lpignore="true" // Bypasses password managers
                 value={message}
                 onChange={handleInputChange}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    handleSendMessage(e); // Pass event to handleSendMessage
+                  }
+                }}
                 placeholder="Type your message..."
                 className="flex-1 bg-zinc-100 border border-zinc-200 text-zinc-800 px-4 py-2.5 rounded-xl focus:border-red-500 focus:outline-none text-sm placeholder:text-zinc-500"
               />
               <button 
-                type="submit"
+                type="button" // Changed from submit to button
+                onClick={handleSendMessage} // Trigger send manually
                 disabled={!message.trim()}
                 className="bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white w-10 h-10 rounded-xl flex items-center justify-center transition-colors shadow-md shrink-0"
               >
@@ -391,7 +404,7 @@ export default function ChatWidget() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
                 </svg>
               </button>
-            </form>
+            </div>
           </div>
         </div>
       )}
