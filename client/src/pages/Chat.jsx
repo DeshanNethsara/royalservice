@@ -108,19 +108,43 @@ export default function Chat() {
     return `Thank you for your message! I'll help you with that.\n\nFor immediate assistance, call us at +94 74 365 8500 or email admin@royalservice.tech.`;
   };
 
+  // Add messages received from the server only once.
+  // The backend may emit both "receive_message" and "newMessage" for compatibility.
   const addMessageIfNew = useCallback((newMessage) => {
+    if (!newMessage) return;
+
     setMessages((prev) => {
-      const exists = prev.some(msg => {
-        if (newMessage._id && msg._id) return msg._id === newMessage._id;
+      const exists = prev.some((msg) => {
+        // MongoDB message ID is the strongest duplicate check.
+        if (msg._id && newMessage._id) {
+          return String(msg._id) === String(newMessage._id);
+        }
+
+        // Fallback for server payloads that do not include an ID.
+        const sameMessage =
+          String(msg.senderId) === String(newMessage.senderId) &&
+          String(msg.threadId) === String(newMessage.threadId) &&
+          msg.text === newMessage.text;
+
+        if (!sameMessage) return false;
+
+        const oldTime = new Date(msg.createdAt || msg.timestamp).getTime();
+        const newTime = new Date(newMessage.createdAt || newMessage.timestamp).getTime();
+
         return (
-          msg.senderId === newMessage.senderId &&
-          msg.threadId === newMessage.threadId &&
-          msg.text === newMessage.text &&
-          Math.abs(new Date(msg.createdAt || msg.timestamp) - new Date(newMessage.createdAt || newMessage.timestamp)) < 1000
+          Number.isFinite(oldTime) &&
+          Number.isFinite(newTime) &&
+          Math.abs(oldTime - newTime) < 1000
         );
       });
+
       if (exists) return prev;
-      return [...prev, newMessage].sort((a, b) => new Date(a.createdAt || a.timestamp) - new Date(b.createdAt || b.timestamp));
+
+      return [...prev, newMessage].sort((a, b) => {
+        const aTime = new Date(a.createdAt || a.timestamp || 0).getTime();
+        const bTime = new Date(b.createdAt || b.timestamp || 0).getTime();
+        return aTime - bTime;
+      });
     });
   }, []);
 
@@ -131,17 +155,20 @@ export default function Chat() {
     }
 
     const userId = getUserId();
-    socket.connect();
 
-    socket.on('connect', () => {
+    const handleConnect = () => {
       socket.emit('user_connected', { userId, role: user.role });
-      
+
       if (isAdminOrStaff) {
         socket.emit('fetch_contacts');
       } else {
+        // Customer chats use the customer's ID as the thread ID.
+        activeThreadRef.current = String(userId);
         setActiveContact({ _id: userId, name: 'Command Center (Admin)', role: 'admin' });
       }
-    });
+    };
+
+    socket.on('connect', handleConnect);
 
     const handleContactsList = (list) => {
       setContacts(list);
@@ -308,7 +335,11 @@ export default function Chat() {
     socket.on('all_chats_cleared', handleAllChatsCleared);
     socket.on('chat_read', handleChatRead); 
 
+    // Register every listener before connecting so the first events are not missed.
+    socket.connect();
+
     return () => {
+      socket.off('connect', handleConnect);
       socket.off('contacts_list', handleContactsList);
       socket.off('user_online', handleUserOnline);
       socket.off('user_offline', handleUserOffline);
@@ -370,19 +401,8 @@ export default function Chat() {
     const userId = getUserId();
     const messageText = message.trim();
 
-    const outgoingMsg = {
-      _id: Date.now().toString(),
-      senderId: userId,
-      senderName: user.name,
-      senderRole: user.role,
-      threadId: activeContact._id,
-      text: messageText,
-      createdAt: new Date().toISOString()
-    };
-    
-    addMessageIfNew(outgoingMsg);
-    setTimeout(() => scrollToBottom(true), 50);
-
+    // Do not insert an optimistic copy here. The server broadcasts the saved
+    // message back through Socket.IO, and handleIncomingMessage renders it once.
     const messageData = {
       senderId: userId,
       senderName: user.name,
@@ -427,19 +447,7 @@ export default function Chat() {
     if (isAdminOrStaff || !activeContact || !user) return;
     const userId = getUserId();
     
-    const outgoingMsg = {
-      _id: Date.now().toString(),
-      senderId: userId,
-      senderName: user.name,
-      senderRole: user.role,
-      threadId: userId,
-      text: command.question,
-      createdAt: new Date().toISOString()
-    };
-    
-    addMessageIfNew(outgoingMsg);
-    setTimeout(() => scrollToBottom(true), 50);
-
+    // The server echo is responsible for adding this message to the chat UI.
     socket.emit('send_message', { senderId: userId, senderName: user.name, senderRole: user.role, threadId: userId, text: command.question });
     
     setTimeout(async () => {
