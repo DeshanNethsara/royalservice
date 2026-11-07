@@ -18,6 +18,7 @@ export default function ChatWidget() {
   const [isOpen, setIsOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const [message, setMessage] = useState('');
+  const [isInputUnlocked, setIsInputUnlocked] = useState(false);
   const [messages, setMessages] = useState([]);
   const [activeContact, setActiveContact] = useState(null);
   const [isTyping, setIsTyping] = useState(false);
@@ -376,27 +377,36 @@ export default function ChatWidget() {
 
           {/* Input Area */}
           <div className="p-3 bg-white border-t border-zinc-100 shrink-0">
-            {/* 🚨 FIX: Changed <form> to <div> to stop Gboard autofill bugs */}
             <div className="flex gap-2">
               <input
-                type="text"
-                name="chatMsgRandom"
-                autoComplete="nope" // Forces Chrome/Gboard to abandon autofill guesses
-                data-lpignore="true" // Bypasses password managers
+                type="search"
+                inputMode="text"
+                enterKeyHint="send"
+                readOnly={!isInputUnlocked}
+                onTouchStart={() => setIsInputUnlocked(true)}
+                onFocus={() => setIsInputUnlocked(true)}
+                name="rsc_chat_search_box"
+                id="rsc_chat_search_box"
+                autoComplete="off"
+                autoCorrect="on"
+                spellCheck="true"
+                data-lpignore="true"
+                data-1p-ignore="true"
+                data-form-type="other"
                 value={message}
                 onChange={handleInputChange}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' && !e.shiftKey) {
                     e.preventDefault();
-                    handleSendMessage(e); // Pass event to handleSendMessage
+                    handleSendMessage(e);
                   }
                 }}
                 placeholder="Type your message..."
-                className="flex-1 bg-zinc-100 border border-zinc-200 text-zinc-800 px-4 py-2.5 rounded-xl focus:border-red-500 focus:outline-none text-sm placeholder:text-zinc-500"
+                className="flex-1 bg-zinc-100 border border-zinc-200 text-zinc-800 px-4 py-2.5 rounded-xl focus:border-red-500 focus:outline-none text-sm placeholder:text-zinc-500 [&::-webkit-search-cancel-button]:hidden"
               />
               <button 
-                type="button" // Changed from submit to button
-                onClick={handleSendMessage} // Trigger send manually
+                type="button"
+                onClick={handleSendMessage}
                 disabled={!message.trim()}
                 className="bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white w-10 h-10 rounded-xl flex items-center justify-center transition-colors shadow-md shrink-0"
               >

@@ -17,6 +17,7 @@ export default function Chat() {
   const navigate = useNavigate();
 
   const [message, setMessage] = useState('');
+  const [isInputUnlocked, setIsInputUnlocked] = useState(false);
   const [messages, setMessages] = useState([]);
   const [contacts, setContacts] = useState([]);
   const [activeContact, setActiveContact] = useState(null);
@@ -350,7 +351,6 @@ export default function Chat() {
     setIsMobileChatOpen(true);
   };
 
-  // Universal Watcher: Auto-scroll on new messages/typing if no unread divider
   useEffect(() => {
     if (activeContact && !firstUnreadId) {
       setTimeout(() => scrollToBottom(true), 150);
@@ -370,7 +370,6 @@ export default function Chat() {
     const userId = getUserId();
     const messageText = message.trim();
 
-    // 🚨 Optimistic UI: Draw message instantly
     const outgoingMsg = {
       _id: Date.now().toString(),
       senderId: userId,
@@ -428,7 +427,6 @@ export default function Chat() {
     if (isAdminOrStaff || !activeContact || !user) return;
     const userId = getUserId();
     
-    // 🚨 Optimistic UI for Quick Commands
     const outgoingMsg = {
       _id: Date.now().toString(),
       senderId: userId,
@@ -742,28 +740,37 @@ export default function Chat() {
           )}
 
           <div className="p-3 md:p-4 bg-zinc-950/50 border-t border-zinc-800 backdrop-blur-xl shrink-0">
-            {/* 🚨 FIX: Changed <form> to <div> to stop Gboard autofill bugs */}
             <div className="flex gap-2 md:gap-3">
               <input
-                type="text"
-                name="adminChatMsgRandom"
-                autoComplete="nope" // Forces Chrome/Gboard to abandon autofill guesses
-                data-lpignore="true" // Bypasses password managers
+                type="search"
+                inputMode="text"
+                enterKeyHint="send"
+                readOnly={!isInputUnlocked}
+                onTouchStart={() => setIsInputUnlocked(true)}
+                onFocus={() => setIsInputUnlocked(true)}
+                name="rsc_admin_search_box"
+                id="rsc_admin_search_box"
+                autoComplete="off"
+                autoCorrect="on"
+                spellCheck="true"
+                data-lpignore="true"
+                data-1p-ignore="true"
+                data-form-type="other"
                 value={message}
                 onChange={handleInputChange}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' && !e.shiftKey) {
                     e.preventDefault();
-                    handleSendMessage(e); // Pass event to handleSendMessage
+                    handleSendMessage(e);
                   }
                 }}
                 disabled={!activeContact}
                 placeholder={activeContact ? 'Type your message...' : 'Awaiting selection...'}
-                className="flex-1 min-w-0 bg-zinc-900 border border-zinc-800 text-white px-4 md:px-5 py-3 md:py-3.5 rounded-xl focus:border-red-600 focus:outline-none transition-colors disabled:opacity-50 text-sm md:text-base placeholder:text-zinc-600"
+                className="flex-1 min-w-0 bg-zinc-900 border border-zinc-800 text-white px-4 md:px-5 py-3 md:py-3.5 rounded-xl focus:border-red-600 focus:outline-none transition-colors disabled:opacity-50 text-sm md:text-base placeholder:text-zinc-600 [&::-webkit-search-cancel-button]:hidden"
               />
               <button
-                type="button" // Changed from submit to button
-                onClick={handleSendMessage} // Trigger send manually
+                type="button"
+                onClick={handleSendMessage}
                 disabled={!message.trim() || !activeContact}
                 className="bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white px-4 md:px-6 rounded-xl font-black tracking-widest transition-all text-sm md:text-base flex items-center justify-center shadow-lg shadow-red-600/20 shrink-0"
               >
