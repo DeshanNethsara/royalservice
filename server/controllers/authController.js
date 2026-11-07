@@ -8,17 +8,27 @@ const generateToken = (id, role) => {
   return jwt.sign({ id, role }, process.env.JWT_SECRET, { expiresIn: '7d' });
 };
 
-// 🚨 NEW: Password validation helper
+// 🚨 Password validation helper
 const validatePassword = (password) => {
   // Minimum 8 chars, at least 1 uppercase, at least 1 number
   const regex = /^(?=.*[A-Z])(?=.*\d).{8,}$/;
   return regex.test(password);
 };
 
+// 🚨 Phone validation helper: exactly 10 digits
+const validatePhone = (phone) => /^\d{10}$/.test(phone);
+
 export const register = async (req, res) => {
   const { name, email, phone, password } = req.body;
 
-  // 🚨 NEW: Validate password strength
+  // 🚨 Validate phone number (exactly 10 digits)
+  if (!validatePhone(phone)) {
+    return res.status(400).json({ 
+      message: 'Phone number must be exactly 10 digits.' 
+    });
+  }
+
+  // 🚨 Validate password strength
   if (!validatePassword(password)) {
     return res.status(400).json({ 
       message: 'Password must be at least 8 characters long, contain at least one uppercase letter, and at least one number.' 
@@ -66,7 +76,7 @@ export const login = async (req, res) => {
       return res.status(403).json({ message: 'Account is suspended. Contact administrator.' });
     }
 
-    // 2. 🚨 CHECK IF ACCOUNT IS LOCKED
+    // 2. Check if account is locked
     if (user && user.lockUntil && user.lockUntil > Date.now()) {
       const minutesLeft = Math.ceil((user.lockUntil - Date.now()) / 60000);
       return res.status(403).json({ 
@@ -77,12 +87,12 @@ export const login = async (req, res) => {
     // 3. Check if user exists AND password matches
     if (!user || !(await bcrypt.compare(password, user.password))) {
       
-      // 🚨 IF USER EXISTS BUT PASSWORD IS WRONG -> INCREMENT ATTEMPTS
+      // If user exists but password is wrong -> increment attempts
       if (user) {
         user.loginAttempts = (user.loginAttempts || 0) + 1;
         let lockMessage = 'Invalid email or password. Please try again.';
 
-        // 🚨 APPLY LOCKOUT LOGIC
+        // Apply lockout logic
         if (user.loginAttempts >= 10) {
           // Second threshold (5 fails + 5 fails) -> Lock for 30 mins
           user.lockUntil = Date.now() + 30 * 60 * 1000; // 30 minutes
@@ -221,7 +231,7 @@ export const resetPassword = async (req, res) => {
   try {
     const { password } = req.body;
 
-    // 🚨 NEW: Validate new password strength
+    // 🚨 Validate new password strength
     if (!validatePassword(password)) {
       return res.status(400).json({ 
         message: 'Password must be at least 8 characters long, contain at least one uppercase letter, and at least one number.' 

@@ -10,6 +10,9 @@ const validatePassword = (password) => {
   return regex.test(password);
 };
 
+// 🚨 Phone validator: exactly 10 digits
+const validatePhone = (phone) => /^\d{10}$/.test(phone);
+
 // 🚨 Live password requirements checklist
 function PasswordRequirements({ password, show }) {
   if (!show) return null;
@@ -42,6 +45,18 @@ function PasswordRequirements({ password, show }) {
   );
 }
 
+// 🚨 Live phone error indicator
+function PhoneError({ phone, show }) {
+  if (!show) return null;
+  if (/^\d{10}$/.test(phone)) return null;
+
+  return (
+    <p className="text-xs text-red-500 mt-1 pl-1 animate-[fadeIn_0.2s_ease-out]">
+      Phone number must be exactly 10 digits.
+    </p>
+  );
+}
+
 export default function Login() {
   const [isRegister, setIsRegister] = useState(false);
   
@@ -54,8 +69,9 @@ export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
-  // 🚨 NEW: Track whether user has interacted with password field
+  // Track whether user has interacted with fields
   const [passwordTouched, setPasswordTouched] = useState(false);
+  const [phoneTouched, setPhoneTouched] = useState(false);
 
   const [formData, setFormData] = useState({ 
     name: '', 
@@ -86,6 +102,12 @@ export default function Login() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    // 🚨 Validate phone number on register (exactly 10 digits)
+    if (isRegister && !validatePhone(formData.phone)) {
+      toast.error("Phone number must be exactly 10 digits.");
+      return;
+    }
 
     // 🚨 Validate password strength on register or reset
     if ((isRegister || resetToken) && !validatePassword(formData.password)) {
@@ -189,7 +211,8 @@ export default function Login() {
     setFormData({ name: '', email: '', phone: '', password: '', confirmPassword: '' });
     setShowPassword(false);
     setShowConfirmPassword(false);
-    setPasswordTouched(false); // 🚨 Reset touched state
+    setPasswordTouched(false);
+    setPhoneTouched(false);
   };
 
   // Determine titles based on current state
@@ -259,16 +282,30 @@ export default function Login() {
                   placeholder="Full Name"
                   required
                   onChange={handleChange}
+                  value={formData.name}
                   className="w-full bg-zinc-950 border border-zinc-800 text-white p-3 md:p-4 rounded-xl focus:border-red-600 focus:ring-1 focus:ring-red-600 focus:outline-none placeholder:text-zinc-600 transition-colors text-sm md:text-base"
                 />
-                <input
-                  type="tel"
-                  name="phone"
-                  placeholder="Phone Number"
-                  required
-                  onChange={handleChange}
-                  className="w-full bg-zinc-950 border border-zinc-800 text-white p-3 md:p-4 rounded-xl focus:border-red-600 focus:ring-1 focus:ring-red-600 focus:outline-none placeholder:text-zinc-600 transition-colors text-sm md:text-base"
-                />
+                <div>
+                  <input
+                    type="tel"
+                    name="phone"
+                    placeholder="Phone Number (10 digits)"
+                    required
+                    inputMode="numeric"
+                    maxLength={10}
+                    pattern="\d{10}"
+                    title="Phone number must be exactly 10 digits."
+                    onChange={(e) => {
+                      // Strip non-digits as the user types
+                      const digitsOnly = e.target.value.replace(/\D/g, '').slice(0, 10);
+                      setFormData({ ...formData, phone: digitsOnly });
+                    }}
+                    onBlur={() => setPhoneTouched(true)}
+                    value={formData.phone}
+                    className="w-full bg-zinc-950 border border-zinc-800 text-white p-3 md:p-4 rounded-xl focus:border-red-600 focus:ring-1 focus:ring-red-600 focus:outline-none placeholder:text-zinc-600 transition-colors text-sm md:text-base"
+                  />
+                  <PhoneError phone={formData.phone} show={phoneTouched} />
+                </div>
               </div>
             )}
 
