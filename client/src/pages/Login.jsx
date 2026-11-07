@@ -4,6 +4,44 @@ import { AuthContext } from '../context/AuthContext';
 import axiosClient from '../api/axiosClient';
 import toast from 'react-hot-toast';
 
+// 🚨 Password strength validator (mirrors backend logic)
+const validatePassword = (password) => {
+  const regex = /^(?=.*[A-Z])(?=.*\d).{8,}$/;
+  return regex.test(password);
+};
+
+// 🚨 Live password requirements checklist
+function PasswordRequirements({ password, show }) {
+  if (!show) return null;
+
+  const rules = [
+    { label: 'At least 8 characters', met: password.length >= 8 },
+    { label: 'At least one uppercase letter (A–Z)', met: /[A-Z]/.test(password) },
+    { label: 'At least one number (0–9)', met: /\d/.test(password) },
+  ];
+
+  return (
+    <ul className="space-y-1.5 mt-2 pl-1 animate-[fadeIn_0.2s_ease-out]">
+      {rules.map((rule, i) => (
+        <li key={i} className="flex items-center gap-2 text-xs">
+          <span
+            className={`w-4 h-4 flex items-center justify-center rounded-full border transition-colors ${
+              rule.met
+                ? 'bg-green-600/20 border-green-500 text-green-400'
+                : 'bg-zinc-800 border-zinc-700 text-zinc-600'
+            }`}
+          >
+            {rule.met ? '✓' : ''}
+          </span>
+          <span className={rule.met ? 'text-green-400' : 'text-zinc-500'}>
+            {rule.label}
+          </span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 export default function Login() {
   const [isRegister, setIsRegister] = useState(false);
   
@@ -12,11 +50,13 @@ export default function Login() {
   const [resetToken, setResetToken] = useState(null);
   const [isSendingReset, setIsSendingReset] = useState(false);
 
-  // NEW: State for show/hide password
+  // State for show/hide password
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
-  // NEW: Added confirmPassword to state
+  // 🚨 NEW: Track whether user has interacted with password field
+  const [passwordTouched, setPasswordTouched] = useState(false);
+
   const [formData, setFormData] = useState({ 
     name: '', 
     email: '', 
@@ -47,10 +87,18 @@ export default function Login() {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    // 🚨 NEW: Check if passwords match (only if registering or resetting)
+    // 🚨 Validate password strength on register or reset
+    if ((isRegister || resetToken) && !validatePassword(formData.password)) {
+      toast.error(
+        "Password must be at least 8 characters, include one uppercase letter, and one number."
+      );
+      return;
+    }
+
+    // Check if passwords match (only if registering or resetting)
     if ((isRegister || resetToken) && formData.password !== formData.confirmPassword) {
       toast.error("Passwords do not match!");
-      return; // Stop the submission
+      return;
     }
     
     // 1. Handle Password Reset
@@ -62,6 +110,7 @@ export default function Login() {
         toast.success('Password reset successfully! You can now log in.');
         setResetToken(null);
         setFormData({ ...formData, password: '', confirmPassword: '' });
+        setPasswordTouched(false);
       } catch (err) {
         toast.dismiss(loadingToast);
         toast.error(err.response?.data?.message || 'Invalid or expired token');
@@ -140,6 +189,7 @@ export default function Login() {
     setFormData({ name: '', email: '', phone: '', password: '', confirmPassword: '' });
     setShowPassword(false);
     setShowConfirmPassword(false);
+    setPasswordTouched(false); // 🚨 Reset touched state
   };
 
   // Determine titles based on current state
@@ -237,27 +287,40 @@ export default function Login() {
 
             {/* Password Field (Hidden during forgot password) */}
             {!isForgotPassword && (
-              <div className="relative">
-                <input
-                  type={showPassword ? "text" : "password"}
-                  name="password"
-                  placeholder={resetToken ? "New Password" : "Password"}
-                  required
-                  onChange={handleChange}
-                  value={formData.password}
-                  className="w-full bg-zinc-950 border border-zinc-800 text-white p-3 md:p-4 pr-12 rounded-xl focus:border-red-600 focus:ring-1 focus:ring-red-600 focus:outline-none placeholder:text-zinc-600 transition-colors text-sm md:text-base"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300 transition-colors"
-                >
-                  {showPassword ? <EyeSlashIcon /> : <EyeIcon />}
-                </button>
-              </div>
+              <>
+                <div className="relative">
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    name="password"
+                    placeholder={resetToken ? "New Password" : "Password"}
+                    required
+                    onChange={handleChange}
+                    onBlur={() => setPasswordTouched(true)}
+                    value={formData.password}
+                    pattern={(isRegister || resetToken) ? "(?=.*[A-Z])(?=.*\\d).{8,}" : undefined}
+                    title={(isRegister || resetToken) ? "Min 8 characters, at least one uppercase letter and one number." : undefined}
+                    className="w-full bg-zinc-950 border border-zinc-800 text-white p-3 md:p-4 pr-12 rounded-xl focus:border-red-600 focus:ring-1 focus:ring-red-600 focus:outline-none placeholder:text-zinc-600 transition-colors text-sm md:text-base"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300 transition-colors"
+                  >
+                    {showPassword ? <EyeSlashIcon /> : <EyeIcon />}
+                  </button>
+                </div>
+
+                {/* 🚨 Live password requirements checklist */}
+                {(isRegister || resetToken) && (
+                  <PasswordRequirements
+                    password={formData.password}
+                    show={passwordTouched || formData.password.length > 0}
+                  />
+                )}
+              </>
             )}
 
-            {/* 🚨 NEW: Confirm Password Field (Only during Registration or Reset) */}
+            {/* Confirm Password Field (Only during Registration or Reset) */}
             {(isRegister || resetToken) && (
               <div className="relative animate-[fadeIn_0.3s_ease-out]">
                 <input

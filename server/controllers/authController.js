@@ -8,8 +8,22 @@ const generateToken = (id, role) => {
   return jwt.sign({ id, role }, process.env.JWT_SECRET, { expiresIn: '7d' });
 };
 
+// 🚨 NEW: Password validation helper
+const validatePassword = (password) => {
+  // Minimum 8 chars, at least 1 uppercase, at least 1 number
+  const regex = /^(?=.*[A-Z])(?=.*\d).{8,}$/;
+  return regex.test(password);
+};
+
 export const register = async (req, res) => {
   const { name, email, phone, password } = req.body;
+
+  // 🚨 NEW: Validate password strength
+  if (!validatePassword(password)) {
+    return res.status(400).json({ 
+      message: 'Password must be at least 8 characters long, contain at least one uppercase letter, and at least one number.' 
+    });
+  }
 
   try {
     const userExists = await User.findOne({ email });
@@ -205,6 +219,15 @@ export const forgotPassword = async (req, res) => {
 // 2. Reset Password using Token
 export const resetPassword = async (req, res) => {
   try {
+    const { password } = req.body;
+
+    // 🚨 NEW: Validate new password strength
+    if (!validatePassword(password)) {
+      return res.status(400).json({ 
+        message: 'Password must be at least 8 characters long, contain at least one uppercase letter, and at least one number.' 
+      });
+    }
+
     const resetPasswordToken = crypto
       .createHash('sha256')
       .update(req.params.token)
@@ -220,7 +243,7 @@ export const resetPassword = async (req, res) => {
     }
 
     const salt = await bcrypt.genSalt(10);
-    user.password = await bcrypt.hash(req.body.password, salt);
+    user.password = await bcrypt.hash(password, salt);
     
     user.resetPasswordToken = undefined;
     user.resetPasswordExpire = undefined;
