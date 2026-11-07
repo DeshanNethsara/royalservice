@@ -110,7 +110,7 @@ export default function ChatWidget() {
       const firstUnread = sortedHistory.find(m => String(m.senderId) !== String(userId) && !m.isRead);
       if (firstUnread) {
         setFirstUnreadId(firstUnread._id);
-        // 🚨 FIX 1: Wait 350ms for the CSS widget-open animation (duration-300) to finish before scrolling
+        // Wait 350ms for the CSS widget-open animation to finish before scrolling
         setTimeout(() => {
           firstUnreadRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
         }, 350); 
@@ -173,7 +173,6 @@ export default function ChatWidget() {
     };
   }, [isUserLoggedIn, user, getUserId, addMessageIfNew, scrollToBottom]);
 
-  // Handle widget opening
   useEffect(() => {
     if (isOpen && activeContact && user?.role !== 'admin') {
       activeThreadRef.current = activeContact._id;
@@ -192,7 +191,6 @@ export default function ChatWidget() {
     }
   }, [isOpen, activeContact, user?.role, getUserId]);
 
-  // 🚨 FIX 2: Universal Scroll Watcher - Auto-scroll on new messages/typing if NO unread divider is active
   useEffect(() => {
     if (isOpen && !firstUnreadId) {
       setTimeout(() => scrollToBottom(true), 150);
@@ -217,8 +215,6 @@ export default function ChatWidget() {
     };
     
     addMessageIfNew(outgoingMsg);
-    
-    // 🚨 FIX 3: Force instant scroll when user sends a message
     setTimeout(() => scrollToBottom(true), 50);
 
     socket.emit('send_message', {
@@ -379,6 +375,8 @@ export default function ChatWidget() {
             <form onSubmit={handleSendMessage} className="flex gap-2">
               <input
                 type="text"
+                name="chatMessageWidget"
+                autoComplete="off"
                 value={message}
                 onChange={handleInputChange}
                 placeholder="Type your message..."

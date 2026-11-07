@@ -39,8 +39,17 @@ export default function Chat() {
 
   const getUserId = useCallback(() => user?._id || user?.id, [user]);
   
-  // 🚨 BULLETPROOF FIX: Group Admin and Staff together for all support-side logic
   const isAdminOrStaff = ['admin', 'staff'].includes(user?.role);
+
+  // 🚨 BULLETPROOF SCROLLING
+  const scrollToBottom = useCallback((smooth = true) => {
+    if (messagesContainerRef.current) {
+      messagesContainerRef.current.scrollTo({
+        top: messagesContainerRef.current.scrollHeight,
+        behavior: smooth ? 'smooth' : 'auto'
+      });
+    }
+  }, []);
 
   const quickCommands = [
     { id: 'booking', label: '📅 How to Book', question: 'How do I book an appointment?' },
@@ -197,17 +206,13 @@ export default function Chat() {
         }, 100);
       } else {
         setFirstUnreadId(null);
-        setTimeout(() => {
-          messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-        }, 100);
+        setTimeout(() => scrollToBottom(false), 100);
       }
     };
     
     const handleIncomingMessage = (newMessage) => {
-      // Allow the message through if you're Staff/Admin, OR if it's meant for you
       if (!isAdminOrStaff && String(newMessage.threadId) !== String(userId)) return;
       
-      // Instantly update contacts preview for Staff and Admin
       if (isAdminOrStaff) {
         setContacts(prev => {
           const updated = prev.map(c => 
@@ -224,13 +229,10 @@ export default function Chat() {
         });
       }
 
-      // If the incoming message belongs to the currently open chat window
       if (String(newMessage.threadId) === String(activeThreadRef.current)) {
         addMessageIfNew(newMessage);
         
-        setTimeout(() => {
-          messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-        }, 100);
+        setTimeout(() => scrollToBottom(true), 150);
 
         if (markReadTimeoutRef.current) clearTimeout(markReadTimeoutRef.current);
         markReadTimeoutRef.current = setTimeout(() => {
@@ -239,7 +241,6 @@ export default function Chat() {
         }, 3000); 
         
       } else if (isAdminOrStaff) {
-        // If it's for a different chat, increase unread badge
         toast.success(`New message from ${newMessage.senderName}`);
         setUnreadCounts(prev => ({ ...prev, [newMessage.threadId]: (prev[newMessage.threadId] || 0) + 1 }));
       }
@@ -324,7 +325,7 @@ export default function Chat() {
       if (markReadTimeoutRef.current) clearTimeout(markReadTimeoutRef.current);
       socket.disconnect();
     };
-  }, [user, navigate, getUserId, addMessageIfNew, isAdminOrStaff]);
+  }, [user, navigate, getUserId, addMessageIfNew, isAdminOrStaff, scrollToBottom]);
 
   const handleOpenChat = (contact) => {
     setActiveContact(contact);
@@ -349,6 +350,13 @@ export default function Chat() {
     setIsMobileChatOpen(true);
   };
 
+  // Universal Watcher: Auto-scroll on new messages/typing if no unread divider
+  useEffect(() => {
+    if (activeContact && !firstUnreadId) {
+      setTimeout(() => scrollToBottom(true), 150);
+    }
+  }, [messages, isTyping, activeContact, firstUnreadId, scrollToBottom]);
+
   useEffect(() => {
     const handleClick = () => setContextMenu(null);
     document.addEventListener('click', handleClick);
@@ -361,6 +369,21 @@ export default function Chat() {
 
     const userId = getUserId();
     const messageText = message.trim();
+
+    // 🚨 Optimistic UI: Draw message instantly
+    const outgoingMsg = {
+      _id: Date.now().toString(),
+      senderId: userId,
+      senderName: user.name,
+      senderRole: user.role,
+      threadId: activeContact._id,
+      text: messageText,
+      createdAt: new Date().toISOString()
+    };
+    
+    addMessageIfNew(outgoingMsg);
+    setTimeout(() => scrollToBottom(true), 50);
+
     const messageData = {
       senderId: userId,
       senderName: user.name,
@@ -371,7 +394,6 @@ export default function Chat() {
 
     socket.emit('send_message', messageData);
 
-    // Update contacts instantly for BOTH Admin and Staff
     if (isAdminOrStaff) {
       setContacts(prev => {
         const updated = prev.map(c => 
@@ -388,14 +410,9 @@ export default function Chat() {
       });
     }
 
-    setTimeout(() => {
-      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }, 100);
-
     setMessage('');
     socket.emit('stop_typing', { threadId: activeContact._id, userId });
 
-    // ONLY auto-reply if they are NOT Admin and NOT Staff
     if (!isAdminOrStaff && !hasSentFirstMessageRef.current) {
       hasSentFirstMessageRef.current = true;
       setTimeout(() => {
@@ -411,12 +428,22 @@ export default function Chat() {
     if (isAdminOrStaff || !activeContact || !user) return;
     const userId = getUserId();
     
+    // 🚨 Optimistic UI for Quick Commands
+    const outgoingMsg = {
+      _id: Date.now().toString(),
+      senderId: userId,
+      senderName: user.name,
+      senderRole: user.role,
+      threadId: userId,
+      text: command.question,
+      createdAt: new Date().toISOString()
+    };
+    
+    addMessageIfNew(outgoingMsg);
+    setTimeout(() => scrollToBottom(true), 50);
+
     socket.emit('send_message', { senderId: userId, senderName: user.name, senderRole: user.role, threadId: userId, text: command.question });
     
-    setTimeout(() => {
-      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }, 100);
-
     setTimeout(async () => {
       const replyText = await getAutoReply(command.question);
       socket.emit('send_message', { senderId: 'bot', senderName: 'Royal Service Center', senderRole: 'bot', threadId: userId, text: replyText });
@@ -430,7 +457,6 @@ export default function Chat() {
 
   const handleContextMenu = (e, contact) => {
     e.preventDefault();
-    // Only Admin can open context menu to hard-delete chats
     if (user?.role === 'admin') setContextMenu({ x: e.clientX, y: e.clientY, contact });
   };
 
@@ -696,7 +722,7 @@ export default function Chat() {
                 );
               })
             )}
-            <div ref={messagesEndRef} />
+            <div ref={messagesEndRef} className="h-2 w-full shrink-0" />
           </div>
 
           {!isAdminOrStaff && (
@@ -719,6 +745,8 @@ export default function Chat() {
             <form onSubmit={handleSendMessage} className="flex gap-2 md:gap-3">
               <input
                 type="text"
+                name="chatMessageDesktop"
+                autoComplete="off"
                 value={message}
                 onChange={handleInputChange}
                 onKeyDown={(e) => {
