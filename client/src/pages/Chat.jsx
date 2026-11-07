@@ -24,9 +24,9 @@ export default function Chat() {
   const [typingUser, setTypingUser] = useState('');
   const [unreadCounts, setUnreadCounts] = useState({});
   const [contextMenu, setContextMenu] = useState(null);
-
-  // 🚨 NEW: Track the time we last opened a chat to show the divider
-  const [lastReadTime, setLastReadTime] = useState({});
+  
+  // 🚨 NEW: Track the ID of the first unread message to render a separator
+  const [firstUnreadId, setFirstUnreadId] = useState(null);
 
   // Mobile view state
   const [isMobileChatOpen, setIsMobileChatOpen] = useState(false);
@@ -34,9 +34,10 @@ export default function Chat() {
   const activeThreadRef = useRef(null);
   const messagesEndRef = useRef(null);
   const messagesContainerRef = useRef(null);
-  const unreadDividerRef = useRef(null); // 🚨 Ref for scrolling to the divider
   const typingTimeoutRef = useRef(null);
   const hasSentFirstMessageRef = useRef(false);
+  const firstUnreadRef = useRef(null); // Ref for scrolling to the unread separator
+  const markReadTimeoutRef = useRef(null); // Ref for the delayed read timer
 
   const getUserId = useCallback(() => user?._id || user?.id, [user]);
 
@@ -55,19 +56,13 @@ export default function Chat() {
     try {
       const response = await axiosClient.get('/bookings/my-bookings');
       const bookings = response.data;
-
-      if (!bookings || bookings.length === 0) {
-        return "You don't have any bookings yet. Click the 'New Booking' button on the dashboard to schedule a service!";
-      }
-
+      if (!bookings || bookings.length === 0) return "You don't have any bookings yet. Click the 'New Booking' button on the dashboard to schedule a service!";
       const recentBookings = bookings.slice(0, 3).map(b => {
         const date = new Date(b.booking_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
         return `• ${b.service_id?.name || 'Service'} (${date}) - Status: ${b.status}`;
       }).join('\n');
-
       return `Here are your recent bookings:\n\n${recentBookings}\n\nFor full details, please visit your Dashboard.`;
     } catch (error) {
-      console.error("Failed to fetch bookings:", error);
       return "I'm having trouble accessing your booking data right now. Please try again later or check your Dashboard.";
     }
   };
@@ -76,64 +71,29 @@ export default function Chat() {
     try {
       const response = await axiosClient.get('/services');
       const services = response.data;
-
-      if (!services || services.length === 0) {
-        return "We are currently updating our service prices. Please check back shortly or visit the booking page!";
-      }
-
+      if (!services || services.length === 0) return "We are currently updating our service prices. Please check back shortly or visit the booking page!";
       const priceList = services.slice(0, 6).map(s => {
-        let priceStr = '';
-        if (typeof s.price === 'number') {
-          priceStr = `LKR ${s.price.toLocaleString()}`;
-        } else if (s.price?.Car) {
-          priceStr = `From LKR ${s.price.Car.toLocaleString()}`;
-        } else {
-          priceStr = 'Contact for price';
-        }
+        let priceStr = typeof s.price === 'number' ? `LKR ${s.price.toLocaleString()}` : s.price?.Car ? `From LKR ${s.price.Car.toLocaleString()}` : 'Contact for price';
         return `• ${s.name}: ${priceStr}`;
       }).join('\n');
-
       return `💰 Our Current Service Prices:\n\n${priceList}\n\n*Prices vary based on vehicle type (Car, SUV, Van). For exact pricing, please visit the Booking page!*`;
     } catch (error) {
-      console.error("Failed to fetch pricing:", error);
       return "I'm having trouble accessing our pricing right now. Please try again later or visit the booking page.";
     }
   };
 
   const getAutoReply = async (question) => {
     const q = question.toLowerCase();
-
-    if (q.includes('status') || q.includes('track') || q.includes('check')) {
-      return await fetchRealBookingStatus();
-    }
-    if (q.includes('price') || q.includes('cost') || q.includes('pricing') || q.includes('fee')) {
-      return await fetchRealPricing();
-    }
-    if (q.includes('cancel') || q.includes('cancellation')) {
-      return `❌ How to Cancel a Booking:\n\nGo to your Dashboard\n2. Navigate to "Upcoming" bookings\n3. Find the booking you want to cancel\n4. Click the "CANCEL" button\n5. Confirm your cancellation\n\n⚠️ Important: Cancellations must be made at least 2 hours before your appointment time.`;
-    }
-    if (/\b(book|booking|appointment|schedule)\b/.test(q)) {
-      return `📅 How to Book an Appointment:\n\nClick on "NEW BOOKING" button on the dashboard\n2. Select your vehicle type (Car, SUV, or Van)\n3. Choose the service you need\n4. Enter your vehicle details (Registration number, Make, Model, Year, Mileage)\n5. Select a convenient date and time slot\n6. Review your booking and confirm\n\n✅ Your booking will be confirmed instantly with a reference number.\n\nNote: You can book up to 7 days in advance.`;
-    }
-    if (q.includes('contact') || q.includes('phone') || q.includes('number') || q.includes('call')) {
-      return `📞 Our Contact Information:\n\nPhone: +94 74 365 8500\nEmail: admin@royalservice.tech\n\nOur support team is available during operating hours.`;
-    }
-    if (q.includes('service') || q.includes('offer') || q.includes('provide')) {
-      return `🔧 Our Services:\n\nFull Service\n2. Oil Change\n3. Brake Service\n4. AC Service\n5. Tire Service\n6. Engine Diagnostics\n7. Battery Service\n8. Wash & Detailing\n\nPrices vary based on vehicle type.`;
-    }
-    if (q.includes('hour') || q.includes('open') || q.includes('time') || q.includes('close')) {
-      return `🕒 Operating Hours:\n\nMonday - Friday: 8:00 AM - 6:00 PM\nSaturday: 9:00 AM - 4:00 PM\nSunday: Closed\n\nLast booking slot is at 3:30 PM.`;
-    }
-    if (q.includes('location') || q.includes('where') || q.includes('address')) {
-      return `📍 Our Location:\n\nRoyal Service Center\n13/5 Service Road,\nColombo 05,\nSri Lanka`;
-    }
-    if (q.includes('thank') || q.includes('thanks')) {
-      return `You're welcome! 😊 Is there anything else I can help you with?`;
-    }
-    if (q.includes('hello') || q.includes('hi') || q.includes('hey')) {
-      return `Hello! 👋 Welcome to Royal Service Center. How can I assist you today?`;
-    }
-
+    if (q.includes('status') || q.includes('track') || q.includes('check')) return await fetchRealBookingStatus();
+    if (q.includes('price') || q.includes('cost') || q.includes('pricing') || q.includes('fee')) return await fetchRealPricing();
+    if (q.includes('cancel') || q.includes('cancellation')) return `❌ How to Cancel a Booking:\n\nGo to your Dashboard\n2. Navigate to "Upcoming" bookings\n3. Find the booking you want to cancel\n4. Click the "CANCEL" button\n5. Confirm your cancellation\n\n⚠️ Important: Cancellations must be made at least 2 hours before your appointment time.`;
+    if (/\b(book|booking|appointment|schedule)\b/.test(q)) return `📅 How to Book an Appointment:\n\nClick on "NEW BOOKING" button on the dashboard\n2. Select your vehicle type (Car, SUV, or Van)\n3. Choose the service you need\n4. Enter your vehicle details (Registration number, Make, Model, Year, Mileage)\n5. Select a convenient date and time slot\n6. Review your booking and confirm\n\n✅ Your booking will be confirmed instantly with a reference number.\n\nNote: You can book up to 7 days in advance.`;
+    if (q.includes('contact') || q.includes('phone') || q.includes('number') || q.includes('call')) return `📞 Our Contact Information:\n\nPhone: +94 74 365 8500\nEmail: admin@royalservice.tech\n\nOur support team is available during operating hours.`;
+    if (q.includes('service') || q.includes('offer') || q.includes('provide')) return `🔧 Our Services:\n\nFull Service\n2. Oil Change\n3. Brake Service\n4. AC Service\n5. Tire Service\n6. Engine Diagnostics\n7. Battery Service\n8. Wash & Detailing\n\nPrices vary based on vehicle type.`;
+    if (q.includes('hour') || q.includes('open') || q.includes('time') || q.includes('close')) return `🕒 Operating Hours:\n\nMonday - Friday: 8:00 AM - 6:00 PM\nSaturday: 9:00 AM - 4:00 PM\nSunday: Closed\n\nLast booking slot is at 3:30 PM.`;
+    if (q.includes('location') || q.includes('where') || q.includes('address')) return `📍 Our Location:\n\nRoyal Service Center\n13/5 Service Road,\nColombo 05,\nSri Lanka`;
+    if (q.includes('thank') || q.includes('thanks')) return `You're welcome! 😊 Is there anything else I can help you with?`;
+    if (q.includes('hello') || q.includes('hi') || q.includes('hey')) return `Hello! 👋 Welcome to Royal Service Center. How can I assist you today?`;
     return `Thank you for your message! I'll help you with that.\n\nFor immediate assistance, call us at +94 74 365 8500 or email admin@royalservice.tech.`;
   };
 
@@ -173,7 +133,6 @@ export default function Chat() {
 
     const handleContactsList = (list) => {
       setContacts(list);
-      
       const initialCounts = {};
       list.forEach(contact => {
         if (contact.unreadCount > 0) {
@@ -195,19 +154,14 @@ export default function Chat() {
       });
       
       setActiveContact(prev => 
-        prev && String(prev._id) === String(newUser._id) 
-          ? { ...prev, isOnline: true } 
-          : prev
+        prev && String(prev._id) === String(newUser._id) ? { ...prev, isOnline: true } : prev
       );
     };
 
     const handleUserOffline = ({ userId }) => {
       setContacts(prev => prev.map(c => String(c._id) === String(userId) ? { ...c, isOnline: false } : c));
-      
       setActiveContact(prev => 
-        prev && String(prev._id) === String(userId) 
-          ? { ...prev, isOnline: false } 
-          : prev
+        prev && String(prev._id) === String(userId) ? { ...prev, isOnline: false } : prev
       );
     };
 
@@ -225,10 +179,27 @@ export default function Chat() {
       });
     };
     
+    // 🚨 WHATSAPP FIX 1: When history loads, find the first unread message to scroll to
     const handleChatHistory = (history) => {
-      setMessages(history || []);
+      const sortedHistory = history || [];
+      setMessages(sortedHistory);
+      
       if (user.role !== 'admin') {
-        hasSentFirstMessageRef.current = (history || []).some(m => String(m.senderId) === String(userId) && m.senderRole !== 'bot');
+        hasSentFirstMessageRef.current = sortedHistory.some(m => String(m.senderId) === String(userId) && m.senderRole !== 'bot');
+      }
+
+      // Find the first message sent by the OTHER person that is NOT read
+      const firstUnread = sortedHistory.find(m => String(m.senderId) !== String(userId) && !m.isRead);
+      if (firstUnread) {
+        setFirstUnreadId(firstUnread._id);
+        setTimeout(() => {
+          firstUnreadRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }, 100);
+      } else {
+        setFirstUnreadId(null);
+        setTimeout(() => {
+          messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+        }, 100);
       }
     };
     
@@ -253,7 +224,19 @@ export default function Chat() {
 
       if (String(newMessage.threadId) === String(activeThreadRef.current)) {
         addMessageIfNew(newMessage);
-        socket.emit('mark_read', { threadId: newMessage.threadId, userId });
+        
+        // If we are looking at the chat, scroll to bottom for THIS specific new message
+        setTimeout(() => {
+          messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+        }, 100);
+
+        // Clear existing timer and restart it to mark as read
+        if (markReadTimeoutRef.current) clearTimeout(markReadTimeoutRef.current);
+        markReadTimeoutRef.current = setTimeout(() => {
+          socket.emit('mark_read', { threadId: newMessage.threadId, userId });
+          setFirstUnreadId(null); // Remove the divider
+        }, 3000); // 3 seconds delay before marking as read
+        
       } else if (user.role === 'admin') {
         toast.success(`New message from ${newMessage.senderName}`);
         setUnreadCounts(prev => ({ ...prev, [newMessage.threadId]: (prev[newMessage.threadId] || 0) + 1 }));
@@ -341,45 +324,36 @@ export default function Chat() {
       socket.off('clear_all_chats_error', handleClearAllError);
       socket.off('chat_read', handleChatRead); 
       if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+      if (markReadTimeoutRef.current) clearTimeout(markReadTimeoutRef.current);
       socket.disconnect();
     };
   }, [user, navigate, getUserId, addMessageIfNew]);
 
-  // 🚨 UPDATED: handleOpenChat to set lastReadTime
+  // 🚨 WHATSAPP FIX 2: Delay marking as read when opening a chat
   const handleOpenChat = (contact) => {
     setActiveContact(contact);
     activeThreadRef.current = contact._id;
     
-    // Save the current time so we can show the "Unread" divider for newer messages
-    setLastReadTime(prev => ({ ...prev, [contact._id]: new Date().toISOString() }));
-
+    // Clear any existing timer
+    if (markReadTimeoutRef.current) clearTimeout(markReadTimeoutRef.current);
+    
     socket.emit('fetch_history', contact._id);
     
     if (unreadCounts[contact._id] > 0) {
-      socket.emit('mark_read', { threadId: contact._id, userId: getUserId() });
-      setUnreadCounts(prev => {
-        const updated = { ...prev };
-        delete updated[contact._id];
-        return updated;
-      });
+      // Wait 5 seconds before confirming the user has "read" it, just like a read receipt delay
+      markReadTimeoutRef.current = setTimeout(() => {
+        socket.emit('mark_read', { threadId: contact._id, userId: getUserId() });
+        setUnreadCounts(prev => {
+          const updated = { ...prev };
+          delete updated[contact._id];
+          return updated;
+        });
+        setFirstUnreadId(null); // Remove the visual divider
+      }, 5000); // 5 seconds
     }
 
     setIsMobileChatOpen(true);
   };
-
-  // 🚨 NEW: Scroll to unread divider or bottom when messages load
-  useEffect(() => {
-    const container = messagesContainerRef.current;
-    if (!container) return;
-
-    if (unreadDividerRef.current) {
-      // If there is an unread divider, scroll it into view
-      unreadDividerRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    } else {
-      // Otherwise, scroll to the bottom
-      container.scrollTop = container.scrollHeight;
-    }
-  }, [messages, activeContact]);
 
   useEffect(() => {
     const handleClick = () => setContextMenu(null);
@@ -419,6 +393,11 @@ export default function Chat() {
       });
     }
 
+    // Scroll to bottom immediately upon sending a message
+    setTimeout(() => {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }, 100);
+
     setMessage('');
     socket.emit('stop_typing', { threadId: activeContact._id, userId });
 
@@ -439,6 +418,10 @@ export default function Chat() {
     
     socket.emit('send_message', { senderId: userId, senderName: user.name, senderRole: user.role, threadId: userId, text: command.question });
     
+    setTimeout(() => {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }, 100);
+
     setTimeout(async () => {
       const replyText = await getAutoReply(command.question);
       socket.emit('send_message', { senderId: 'bot', senderName: 'Royal Service Center', senderRole: 'bot', threadId: userId, text: replyText });
@@ -486,25 +469,6 @@ export default function Chat() {
   const formatTime = (timestamp) => {
     if (!timestamp) return '';
     return new Date(timestamp).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
-  };
-
-  // 🚨 NEW: Helper to check if we should show the unread divider
-  const shouldShowDivider = (msg, index, contactId) => {
-    if (!contactId || !lastReadTime[contactId]) return false;
-    if (isMe(msg.senderId)) return false; // Don't show divider above our own messages
-    
-    const msgTime = new Date(msg.createdAt || msg.timestamp);
-    const readTime = new Date(lastReadTime[contactId]);
-    
-    // Show if this message is newer than the read time
-    // AND the previous message was older (or it's the first unread)
-    if (msgTime > readTime) {
-      if (index === 0) return true; // First message in history is unread
-      
-      const prevMsgTime = new Date(messages[index - 1].createdAt || messages[index - 1].timestamp);
-      return prevMsgTime <= readTime; // Previous was read
-    }
-    return false;
   };
 
   return (
@@ -643,6 +607,7 @@ export default function Chat() {
                       setIsMobileChatOpen(false);
                       setActiveContact(null);
                       activeThreadRef.current = null;
+                      if (markReadTimeoutRef.current) clearTimeout(markReadTimeoutRef.current);
                     }}
                     className="md:hidden text-zinc-400 hover:text-white p-1 mr-1"
                   >
@@ -698,17 +663,18 @@ export default function Chat() {
               messages.map((msg, index) => {
                 const isMyMessage = isMe(msg.senderId);
                 const isBot = msg.senderRole === 'bot';
-                const showDivider = shouldShowDivider(msg, index, activeContact._id);
+                const isFirstUnread = msg._id === firstUnreadId;
 
                 return (
                   <React.Fragment key={msg._id || `${msg.createdAt}-${index}`}>
-                    
-                    {/* 🚨 NEW: Unread Messages Divider */}
-                    {showDivider && (
-                      <div ref={unreadDividerRef} className="flex items-center justify-center my-6 sticky top-0 z-10">
-                        <div className="bg-zinc-800/90 backdrop-blur-md text-white text-[10px] md:text-xs font-bold uppercase tracking-widest px-4 py-2 rounded-full shadow-lg border border-zinc-700">
+                    {/* 🚨 WHATSAPP FIX 3: Render visual separator for unread messages */}
+                    {isFirstUnread && (
+                      <div ref={firstUnreadRef} className="flex items-center justify-center my-6">
+                        <div className="h-px bg-zinc-800 flex-1"></div>
+                        <span className="px-3 py-1 bg-red-600/10 text-red-500 text-[10px] font-black uppercase tracking-widest rounded-full border border-red-600/20">
                           Unread Messages
-                        </div>
+                        </span>
+                        <div className="h-px bg-zinc-800 flex-1"></div>
                       </div>
                     )}
 
