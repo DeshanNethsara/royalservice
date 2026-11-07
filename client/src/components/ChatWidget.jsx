@@ -26,7 +26,6 @@ export default function ChatWidget() {
   const [firstUnreadId, setFirstUnreadId] = useState(null);
   
   const activeThreadRef = useRef(null);
-  const messagesEndRef = useRef(null);
   const messagesContainerRef = useRef(null);
   const typingTimeoutRef = useRef(null);
   const hasSentFirstMessageRef = useRef(false);
@@ -40,6 +39,16 @@ export default function ChatWidget() {
 
   const getUserId = useCallback(() => user?._id || user?.id, [user]);
   const isUserLoggedIn = !!user;
+
+  // 🚨 BULLETPROOF SCROLLING: Safely targets the container height
+  const scrollToBottom = useCallback((smooth = true) => {
+    if (messagesContainerRef.current) {
+      messagesContainerRef.current.scrollTo({
+        top: messagesContainerRef.current.scrollHeight,
+        behavior: smooth ? 'smooth' : 'auto'
+      });
+    }
+  }, []);
 
   const quickCommands = [
     { id: 'booking', label: '📅 How to Book', question: 'How do I book an appointment?' },
@@ -101,14 +110,13 @@ export default function ChatWidget() {
       const firstUnread = sortedHistory.find(m => String(m.senderId) !== String(userId) && !m.isRead);
       if (firstUnread) {
         setFirstUnreadId(firstUnread._id);
+        // 🚨 FIX 1: Wait 350ms for the CSS widget-open animation (duration-300) to finish before scrolling
         setTimeout(() => {
           firstUnreadRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        }, 100);
+        }, 350); 
       } else {
         setFirstUnreadId(null);
-        setTimeout(() => {
-          messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
-        }, 100);
+        setTimeout(() => scrollToBottom(false), 350); 
       }
     };
 
@@ -117,10 +125,6 @@ export default function ChatWidget() {
       
       if (user.role !== 'admin') {
         addMessageIfNew(newMessage);
-        // 🚨 FIX: ALWAYS scroll down when a message comes in
-        setTimeout(() => {
-          messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
-        }, 150);
       }
 
       if (String(newMessage.senderId) !== String(userId)) {
@@ -142,8 +146,6 @@ export default function ChatWidget() {
       if (user.role !== 'admin' && String(threadId) === String(userId)) {
         setIsTyping(true);
         setTypingUser(userName);
-        // Gently scroll to bottom if someone is typing
-        setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' }), 100);
       }
     };
 
@@ -169,8 +171,9 @@ export default function ChatWidget() {
       if (markReadTimeoutRef.current) clearTimeout(markReadTimeoutRef.current);
       socket.disconnect();
     };
-  }, [isUserLoggedIn, user, getUserId, addMessageIfNew]);
+  }, [isUserLoggedIn, user, getUserId, addMessageIfNew, scrollToBottom]);
 
+  // Handle widget opening
   useEffect(() => {
     if (isOpen && activeContact && user?.role !== 'admin') {
       activeThreadRef.current = activeContact._id;
@@ -189,6 +192,13 @@ export default function ChatWidget() {
     }
   }, [isOpen, activeContact, user?.role, getUserId]);
 
+  // 🚨 FIX 2: Universal Scroll Watcher - Auto-scroll on new messages/typing if NO unread divider is active
+  useEffect(() => {
+    if (isOpen && !firstUnreadId) {
+      setTimeout(() => scrollToBottom(true), 150);
+    }
+  }, [messages, isTyping, isOpen, firstUnreadId, scrollToBottom]);
+
   const handleSendMessage = (e) => {
     e.preventDefault();
     if (!message.trim() || !activeContact) return;
@@ -196,7 +206,6 @@ export default function ChatWidget() {
     const userId = getUserId();
     const messageText = message.trim();
     
-    // 🚨 FIX: Optimistic UI rendering (Instantly draw the message on screen)
     const outgoingMsg = {
       _id: Date.now().toString(),
       senderId: userId,
@@ -209,10 +218,8 @@ export default function ChatWidget() {
     
     addMessageIfNew(outgoingMsg);
     
-    // 🚨 FIX: Ensure it scrolls strictly to the bottom instantly
-    setTimeout(() => {
-      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
-    }, 50);
+    // 🚨 FIX 3: Force instant scroll when user sends a message
+    setTimeout(() => scrollToBottom(true), 50);
 
     socket.emit('send_message', {
       senderId: userId,
@@ -240,7 +247,6 @@ export default function ChatWidget() {
     if (!activeContact || user?.role === 'admin') return;
     const userId = getUserId();
     
-    // 🚨 FIX: Optimistic UI for Quick Commands too
     const outgoingMsg = {
       _id: Date.now().toString(),
       senderId: userId,
@@ -252,7 +258,7 @@ export default function ChatWidget() {
     };
     
     addMessageIfNew(outgoingMsg);
-    setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' }), 50);
+    setTimeout(() => scrollToBottom(true), 50);
 
     socket.emit('send_message', { senderId: userId, senderName: user.name, senderRole: user.role, threadId: userId, text: cmd.question });
     
@@ -351,8 +357,6 @@ export default function ChatWidget() {
                 </React.Fragment>
               );
             })}
-            {/* 🚨 FIX: Added a small spacer at the bottom so the last message clears the quick commands */}
-            <div ref={messagesEndRef} className="h-2 w-full shrink-0" />
           </div>
 
           {/* Quick Commands */}
