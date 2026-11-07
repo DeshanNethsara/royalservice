@@ -122,17 +122,29 @@ const buildServiceRecordPDF = (booking, report, payment) => {
     y += 25;
 
     const cardW = (PAGE_W - M * 2 - 20) / 2;
-    const cardH = 90;
+    // Increased card height slightly to accommodate longer wrapped text
+    const cardH = 105; 
+    
+    // 🚨 UPDATED: Dynamic text height calculation to prevent overlap
     const drawInfoCard = (x, yPos, title, lines) => {
       doc.rect(x, yPos, cardW, cardH).fill(LIGHT_GRAY);
       doc.rect(x, yPos, 4, cardH).fill(BRAND_RED);
       doc.fillColor(BRAND_RED).fontSize(8).font('Helvetica-Bold').text(title, x + 15, yPos + 12, { characterSpacing: 1.2 });
+      
       let lineY = yPos + 30;
+      
       lines.forEach((line, i) => {
-        if (i === 0) doc.font('Helvetica-Bold').fontSize(11).fillColor(BRAND_DARK);
-        else doc.font('Helvetica').fontSize(9).fillColor(GRAY_TEXT);
+        if (i === 0) {
+            doc.font('Helvetica-Bold').fontSize(11).fillColor(BRAND_DARK);
+        } else {
+            doc.font('Helvetica').fontSize(9).fillColor(GRAY_TEXT);
+        }
+        
         doc.text(line, x + 15, lineY, { width: cardW - 25 });
-        lineY += i === 0 ? 18 : 13;
+        
+        // Calculate the height of the string including word wraps
+        const textHeight = doc.heightOfString(line, { width: cardW - 25 });
+        lineY += textHeight + 4; // Add 4px padding between lines
       });
     };
 
@@ -366,7 +378,6 @@ export const getAllBookings = async (req, res) => {
   } catch (error) { res.status(500).json({ message: error.message }); }
 };
 
-// 🚨 UPDATED: Assign Staff with Email Notification
 export const assignStaff = async (req, res) => {
   try {
     const booking = await Booking.findByIdAndUpdate(
@@ -381,7 +392,6 @@ export const assignStaff = async (req, res) => {
 
     if (!booking) return res.status(404).json({ message: 'Booking not found' });
 
-    // 🚨 Send email if a staff member was assigned
     if (booking.staff_id && booking.staff_id.email) {
       try {
         await sendEmail({
@@ -396,7 +406,7 @@ export const assignStaff = async (req, res) => {
               <h3 style="margin-top: 0; color: #18181b;">Job Details</h3>
               <p><strong>Booking Ref:</strong> ${booking.booking_ref}</p>
               <p><strong>Customer:</strong> ${booking.user_id?.name || 'N/A'} (${booking.user_id?.phone || 'No phone'})</p>
-              <p><strong>Vehicle:</strong> ${booking.vehicle_id?.reg_number || 'N/A'} - ${booking.vehicle_id?.make || ''} ${booking.vehicle_id?.model || ''}</p>
+              <p><strong>Vehicle:</strong> ${booking.vehicle_id?.reg_number || 'N/A'} ${booking.vehicle_id?.make || ''} ${booking.vehicle_id?.model || ''}</p>
               <p><strong>Service:</strong> ${booking.service_id?.name || 'N/A'}</p>
               <p><strong>Date:</strong> ${booking.booking_date}</p>
               <p><strong>Time:</strong> ${booking.booking_time}</p>
@@ -550,9 +560,6 @@ export const generateServiceRecordPDF = async (req, res) => {
   }
 };
 
-// ==========================================================
-// 🚨 GENERATE MONTHLY REPORT PDF (UPDATED ALIGNMENT & METRICS)
-// ==========================================================
 export const generateMonthlyReportPDF = async (req, res) => {
   try {
     const { year, month } = req.query;
