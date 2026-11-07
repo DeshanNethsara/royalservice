@@ -366,10 +366,53 @@ export const getAllBookings = async (req, res) => {
   } catch (error) { res.status(500).json({ message: error.message }); }
 };
 
+// 🚨 UPDATED: Assign Staff with Email Notification
 export const assignStaff = async (req, res) => {
   try {
-    const booking = await Booking.findByIdAndUpdate(req.params.id, { staff_id: req.body.staff_id || null }, { new: true }).populate('staff_id', 'name email');
+    const booking = await Booking.findByIdAndUpdate(
+      req.params.id, 
+      { staff_id: req.body.staff_id || null }, 
+      { new: true }
+    )
+    .populate('staff_id', 'name email')
+    .populate('user_id', 'name phone')
+    .populate('vehicle_id', 'reg_number make model')
+    .populate('service_id', 'name');
+
     if (!booking) return res.status(404).json({ message: 'Booking not found' });
+
+    // 🚨 Send email if a staff member was assigned
+    if (booking.staff_id && booking.staff_id.email) {
+      try {
+        await sendEmail({
+          email: booking.staff_id.email,
+          subject: `🛠️ New Job Assigned: ${booking.service_id?.name || 'Service'}`,
+          html: `
+            <h2>New Deployment Assigned</h2>
+            <p>Hi ${booking.staff_id.name},</p>
+            <p>You have been assigned a new vehicle service deployment. Please review the details below:</p>
+            
+            <div style="background-color: #f4f4f5; padding: 15px; border-radius: 8px; margin: 20px 0; color: #18181b;">
+              <h3 style="margin-top: 0; color: #18181b;">Job Details</h3>
+              <p><strong>Booking Ref:</strong> ${booking.booking_ref}</p>
+              <p><strong>Customer:</strong> ${booking.user_id?.name || 'N/A'} (${booking.user_id?.phone || 'No phone'})</p>
+              <p><strong>Vehicle:</strong> ${booking.vehicle_id?.reg_number || 'N/A'} - ${booking.vehicle_id?.make || ''} ${booking.vehicle_id?.model || ''}</p>
+              <p><strong>Service:</strong> ${booking.service_id?.name || 'N/A'}</p>
+              <p><strong>Date:</strong> ${booking.booking_date}</p>
+              <p><strong>Time:</strong> ${booking.booking_time}</p>
+            </div>
+            
+            <p>Please log in to your Staff Dashboard to view the full details and start the job.</p>
+            <br>
+            <p>Thank you,<br>Royal Service Center Admin</p>
+          `
+        });
+        console.log(`✅ Assignment email sent to staff: ${booking.staff_id.email}`);
+      } catch (emailError) {
+        console.error(`❌ Failed to send assignment email to ${booking.staff_id.email}:`, emailError);
+      }
+    }
+
     res.json({ message: 'Staff assigned successfully', booking });
   } catch (error) { res.status(500).json({ message: error.message }); }
 };

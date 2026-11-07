@@ -23,12 +23,16 @@ export default function ChatWidget() {
   const [isTyping, setIsTyping] = useState(false);
   const [typingUser, setTypingUser] = useState('');
   
+  // 🚨 NEW: Track the time we last opened a chat to show the divider
+  const [lastReadTime, setLastReadTime] = useState(null);
+
   const activeThreadRef = useRef(null);
   const messagesEndRef = useRef(null);
   const messagesContainerRef = useRef(null);
+  const unreadDividerRef = useRef(null); // 🚨 Ref for scrolling to the divider
   const typingTimeoutRef = useRef(null);
   const hasSentFirstMessageRef = useRef(false);
-  
+
   // 🚨 FIX: Track if the widget is open synchronously for socket events
   const isOpenRef = useRef(isOpen);
   useEffect(() => {
@@ -36,7 +40,7 @@ export default function ChatWidget() {
   }, [isOpen]);
 
   const getUserId = useCallback(() => user?._id || user?.id, [user]);
-  const isUserLoggedIn = !!user;
+  const isUserLoggedIn = !!user && user.role !== 'admin';
 
   const quickCommands = [
     { id: 'booking', label: '📅 How to Book', question: 'How do I book an appointment?' },
@@ -145,26 +149,45 @@ export default function ChatWidget() {
     };
   }, [isUserLoggedIn, user, getUserId, addMessageIfNew]);
 
-  // 🚨 FIX: Trigger mark_read when the user opens the widget
+  // 🚨 UPDATED: Trigger mark_read and set lastReadTime when the user opens the widget
   useEffect(() => {
     if (isOpen && activeContact && user?.role !== 'admin') {
       activeThreadRef.current = activeContact._id;
       
+      // Record the time we opened the chat
+      setLastReadTime(new Date().toISOString());
+
       // Tell backend to clear the unread badge
       socket.emit('mark_read', { threadId: activeContact._id, userId: getUserId() });
       socket.emit('fetch_history', activeContact._id);
       
       setUnreadCount(0);
-      setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
     } else if (!isOpen) {
       // Forget active thread when closed
       activeThreadRef.current = null;
     }
   }, [isOpen, activeContact, user?.role, getUserId]);
 
+  // 🚨 NEW: Scroll to unread divider or bottom when messages load
+  useEffect(() => {
+    const container = messagesContainerRef.current;
+    if (!container) return;
+
+    // Small delay to ensure DOM is rendered
+    setTimeout(() => {
+      if (unreadDividerRef.current) {
+        // Scroll to the unread divider
+        unreadDividerRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      } else {
+        // Scroll to bottom
+        container.scrollTop = container.scrollHeight;
+      }
+    }, 100);
+  }, [messages, isOpen, activeContact]);
+
   useEffect(() => {
     if (isOpen) messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, isOpen, isTyping]);
+  }, [isTyping]);
 
   const handleSendMessage = (e) => {
     e.preventDefault();
@@ -215,11 +238,31 @@ export default function ChatWidget() {
     }, 1000);
   };
 
+  const getUserIdFunc = useCallback(() => user?._id || user?.id, [user]);
+
+  // 🚨 NEW: Helper to check if we should show the unread divider
+  const shouldShowDivider = (msg, index) => {
+    if (!lastReadTime) return false;
+    if (String(msg.senderId) === String(getUserIdFunc())) return false; // Don't show above our own messages
+    
+    const msgTime = new Date(msg.createdAt);
+    const readTime = new Date(lastReadTime);
+    
+    // Show if this message is newer than the read time
+    if (msgTime > readTime) {
+      if (index === 0) return true; // First message in history is unread
+      
+      const prevMsgTime = new Date(messages[index - 1].createdAt);
+      return prevMsgTime <= readTime; // Previous was read
+    }
+    return false;
+  };
+
   return (
     <div className="fixed bottom-0 right-0 md:bottom-6 md:right-6 z-[100] font-sans flex flex-col items-end pointer-events-none w-full md:w-auto p-4 md:p-0">
       
       {/* Chat Window (Only for Customers/Staff) */}
-      {isUserLoggedIn && user.role !== 'admin' && (
+      {isUserLoggedIn && (
         <div 
           className={`bg-white rounded-2xl shadow-2xl border border-zinc-200 w-full md:w-[380px] max-w-[100vw] overflow-hidden transition-all duration-300 transform origin-bottom-right flex flex-col pointer-events-auto mb-4 ${
             isOpen ? 'scale-100 opacity-100 h-[500px]' : 'scale-0 opacity-0 h-0 w-0 absolute bottom-16 right-0'
@@ -255,21 +298,35 @@ export default function ChatWidget() {
             </div>
 
             {messages.map((msg, index) => {
-              const isMe = String(msg.senderId) === String(getUserId());
+              const isMe = String(msg.senderId) === String(getUserIdFunc());
               const isBot = msg.senderRole === 'bot';
+              const showDivider = shouldShowDivider(msg, index);
+
               return (
-                <div key={msg._id || index} className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}>
-                  <span className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider mb-1">
-                    {isMe ? 'You' : isBot ? 'Bot' : msg.senderName}
-                  </span>
-                  <div className={`max-w-[85%] p-3 rounded-2xl text-sm ${
-                    isMe ? 'bg-red-600 text-white rounded-tr-sm shadow-md' 
-                    : isBot ? 'bg-purple-100 border border-purple-200 text-purple-900 rounded-tl-sm'
-                    : 'bg-white border border-zinc-200 text-zinc-700 rounded-tl-sm shadow-sm'
-                  }`}>
-                    <p className="whitespace-pre-wrap">{msg.text}</p>
+                <React.Fragment key={msg._id || index}>
+                  
+                  {/* 🚨 NEW: Unread Messages Divider */}
+                  {showDivider && (
+                    <div ref={unreadDividerRef} className="flex items-center justify-center my-4 sticky top-0 z-10">
+                      <div className="bg-zinc-200/90 backdrop-blur-sm text-zinc-600 text-[10px] font-bold uppercase tracking-widest px-4 py-1.5 rounded-full shadow-sm border border-zinc-300">
+                        Unread Messages
+                      </div>
+                    </div>
+                  )}
+
+                  <div className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}>
+                    <span className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider mb-1">
+                      {isMe ? 'You' : isBot ? 'Bot' : msg.senderName}
+                    </span>
+                    <div className={`max-w-[85%] p-3 rounded-2xl text-sm ${
+                      isMe ? 'bg-red-600 text-white rounded-tr-sm shadow-md' 
+                      : isBot ? 'bg-purple-100 border border-purple-200 text-purple-900 rounded-tl-sm'
+                      : 'bg-white border border-zinc-200 text-zinc-700 rounded-tl-sm shadow-sm'
+                    }`}>
+                      <p className="whitespace-pre-wrap">{msg.text}</p>
+                    </div>
                   </div>
-                </div>
+                </React.Fragment>
               );
             })}
             <div ref={messagesEndRef} />

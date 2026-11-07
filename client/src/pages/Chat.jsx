@@ -25,12 +25,16 @@ export default function Chat() {
   const [unreadCounts, setUnreadCounts] = useState({});
   const [contextMenu, setContextMenu] = useState(null);
 
+  // 🚨 NEW: Track the time we last opened a chat to show the divider
+  const [lastReadTime, setLastReadTime] = useState({});
+
   // Mobile view state
   const [isMobileChatOpen, setIsMobileChatOpen] = useState(false);
 
   const activeThreadRef = useRef(null);
   const messagesEndRef = useRef(null);
   const messagesContainerRef = useRef(null);
+  const unreadDividerRef = useRef(null); // 🚨 Ref for scrolling to the divider
   const typingTimeoutRef = useRef(null);
   const hasSentFirstMessageRef = useRef(false);
 
@@ -231,7 +235,6 @@ export default function Chat() {
     const handleIncomingMessage = (newMessage) => {
       if (user.role !== 'admin' && String(newMessage.threadId) !== String(userId)) return;
       
-      // 🚨 FIX: ALWAYS update the left-side contacts preview for Admins
       if (user.role === 'admin') {
         setContacts(prev => {
           const updated = prev.map(c => 
@@ -248,7 +251,6 @@ export default function Chat() {
         });
       }
 
-      // Handle the main chat window and unread badge logic
       if (String(newMessage.threadId) === String(activeThreadRef.current)) {
         addMessageIfNew(newMessage);
         socket.emit('mark_read', { threadId: newMessage.threadId, userId });
@@ -343,10 +345,14 @@ export default function Chat() {
     };
   }, [user, navigate, getUserId, addMessageIfNew]);
 
+  // 🚨 UPDATED: handleOpenChat to set lastReadTime
   const handleOpenChat = (contact) => {
     setActiveContact(contact);
     activeThreadRef.current = contact._id;
     
+    // Save the current time so we can show the "Unread" divider for newer messages
+    setLastReadTime(prev => ({ ...prev, [contact._id]: new Date().toISOString() }));
+
     socket.emit('fetch_history', contact._id);
     
     if (unreadCounts[contact._id] > 0) {
@@ -361,10 +367,19 @@ export default function Chat() {
     setIsMobileChatOpen(true);
   };
 
+  // 🚨 NEW: Scroll to unread divider or bottom when messages load
   useEffect(() => {
     const container = messagesContainerRef.current;
-    if (container) container.scrollTop = container.scrollHeight;
-  }, [messages]);
+    if (!container) return;
+
+    if (unreadDividerRef.current) {
+      // If there is an unread divider, scroll it into view
+      unreadDividerRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    } else {
+      // Otherwise, scroll to the bottom
+      container.scrollTop = container.scrollHeight;
+    }
+  }, [messages, activeContact]);
 
   useEffect(() => {
     const handleClick = () => setContextMenu(null);
@@ -388,7 +403,6 @@ export default function Chat() {
 
     socket.emit('send_message', messageData);
 
-    // 🚨 FIX: Instantly update the left sidebar preview with the outgoing message
     if (user.role === 'admin') {
       setContacts(prev => {
         const updated = prev.map(c => 
@@ -472,6 +486,25 @@ export default function Chat() {
   const formatTime = (timestamp) => {
     if (!timestamp) return '';
     return new Date(timestamp).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+  };
+
+  // 🚨 NEW: Helper to check if we should show the unread divider
+  const shouldShowDivider = (msg, index, contactId) => {
+    if (!contactId || !lastReadTime[contactId]) return false;
+    if (isMe(msg.senderId)) return false; // Don't show divider above our own messages
+    
+    const msgTime = new Date(msg.createdAt || msg.timestamp);
+    const readTime = new Date(lastReadTime[contactId]);
+    
+    // Show if this message is newer than the read time
+    // AND the previous message was older (or it's the first unread)
+    if (msgTime > readTime) {
+      if (index === 0) return true; // First message in history is unread
+      
+      const prevMsgTime = new Date(messages[index - 1].createdAt || messages[index - 1].timestamp);
+      return prevMsgTime <= readTime; // Previous was read
+    }
+    return false;
   };
 
   return (
@@ -665,23 +698,37 @@ export default function Chat() {
               messages.map((msg, index) => {
                 const isMyMessage = isMe(msg.senderId);
                 const isBot = msg.senderRole === 'bot';
+                const showDivider = shouldShowDivider(msg, index, activeContact._id);
+
                 return (
-                  <div key={msg._id || `${msg.createdAt}-${index}`} className={`flex flex-col ${isMyMessage ? 'items-end' : 'items-start'}`}>
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider">
-                        {isMyMessage ? 'You' : isBot ? '🏢 Royal Service Center' : msg.senderName}
-                      </span>
-                      {msg.createdAt && <span className="text-[9px] text-zinc-600">{formatTime(msg.createdAt)}</span>}
+                  <React.Fragment key={msg._id || `${msg.createdAt}-${index}`}>
+                    
+                    {/* 🚨 NEW: Unread Messages Divider */}
+                    {showDivider && (
+                      <div ref={unreadDividerRef} className="flex items-center justify-center my-6 sticky top-0 z-10">
+                        <div className="bg-zinc-800/90 backdrop-blur-md text-white text-[10px] md:text-xs font-bold uppercase tracking-widest px-4 py-2 rounded-full shadow-lg border border-zinc-700">
+                          Unread Messages
+                        </div>
+                      </div>
+                    )}
+
+                    <div className={`flex flex-col ${isMyMessage ? 'items-end' : 'items-start'}`}>
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider">
+                          {isMyMessage ? 'You' : isBot ? '🏢 Royal Service Center' : msg.senderName}
+                        </span>
+                        {msg.createdAt && <span className="text-[9px] text-zinc-600">{formatTime(msg.createdAt)}</span>}
+                      </div>
+                      <div className={`max-w-[85%] md:max-w-[70%] p-3 md:p-4 rounded-2xl ${
+                        isMyMessage ? 'bg-red-600 text-white rounded-tr-sm shadow-[0_5px_15px_rgba(220,38,38,0.25)]'
+                        : isBot ? 'bg-purple-600/20 border border-purple-500/30 text-purple-100 rounded-tl-sm'
+                        : msg.senderRole === 'admin' ? 'bg-emerald-600/20 border border-emerald-500/30 text-emerald-100 rounded-tl-sm'
+                        : 'bg-zinc-800 border border-zinc-700 text-zinc-200 rounded-tl-sm'
+                      }`}>
+                        <p className="text-sm font-medium leading-relaxed whitespace-pre-wrap">{msg.text}</p>
+                      </div>
                     </div>
-                    <div className={`max-w-[85%] md:max-w-[70%] p-3 md:p-4 rounded-2xl ${
-                      isMyMessage ? 'bg-red-600 text-white rounded-tr-sm shadow-[0_5px_15px_rgba(220,38,38,0.25)]'
-                      : isBot ? 'bg-purple-600/20 border border-purple-500/30 text-purple-100 rounded-tl-sm'
-                      : msg.senderRole === 'admin' ? 'bg-emerald-600/20 border border-emerald-500/30 text-emerald-100 rounded-tl-sm'
-                      : 'bg-zinc-800 border border-zinc-700 text-zinc-200 rounded-tl-sm'
-                    }`}>
-                      <p className="text-sm font-medium leading-relaxed whitespace-pre-wrap">{msg.text}</p>
-                    </div>
-                  </div>
+                  </React.Fragment>
                 );
               })
             )}
