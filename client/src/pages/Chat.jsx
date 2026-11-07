@@ -25,10 +25,8 @@ export default function Chat() {
   const [unreadCounts, setUnreadCounts] = useState({});
   const [contextMenu, setContextMenu] = useState(null);
   
-  // Track the ID of the first unread message to render a separator
   const [firstUnreadId, setFirstUnreadId] = useState(null);
 
-  // Mobile view state
   const [isMobileChatOpen, setIsMobileChatOpen] = useState(false);
 
   const activeThreadRef = useRef(null);
@@ -40,6 +38,9 @@ export default function Chat() {
   const markReadTimeoutRef = useRef(null); 
 
   const getUserId = useCallback(() => user?._id || user?.id, [user]);
+  
+  // 🚨 BULLETPROOF FIX: Group Admin and Staff together for all support-side logic
+  const isAdminOrStaff = ['admin', 'staff'].includes(user?.role);
 
   const quickCommands = [
     { id: 'booking', label: '📅 How to Book', question: 'How do I book an appointment?' },
@@ -124,7 +125,8 @@ export default function Chat() {
 
     socket.on('connect', () => {
       socket.emit('user_connected', { userId, role: user.role });
-      if (user.role === 'admin') {
+      
+      if (isAdminOrStaff) {
         socket.emit('fetch_contacts');
       } else {
         setActiveContact({ _id: userId, name: 'Command Center (Admin)', role: 'admin' });
@@ -183,11 +185,10 @@ export default function Chat() {
       const sortedHistory = history || [];
       setMessages(sortedHistory);
       
-      if (user.role !== 'admin') {
+      if (!isAdminOrStaff) {
         hasSentFirstMessageRef.current = sortedHistory.some(m => String(m.senderId) === String(userId) && m.senderRole !== 'bot');
       }
 
-      // Find the first message sent by the OTHER person that is NOT read
       const firstUnread = sortedHistory.find(m => String(m.senderId) !== String(userId) && !m.isRead);
       if (firstUnread) {
         setFirstUnreadId(firstUnread._id);
@@ -203,9 +204,11 @@ export default function Chat() {
     };
     
     const handleIncomingMessage = (newMessage) => {
-      if (user.role !== 'admin' && String(newMessage.threadId) !== String(userId)) return;
+      // Allow the message through if you're Staff/Admin, OR if it's meant for you
+      if (!isAdminOrStaff && String(newMessage.threadId) !== String(userId)) return;
       
-      if (user.role === 'admin') {
+      // Instantly update contacts preview for Staff and Admin
+      if (isAdminOrStaff) {
         setContacts(prev => {
           const updated = prev.map(c => 
             String(c._id) === String(newMessage.threadId) 
@@ -221,10 +224,10 @@ export default function Chat() {
         });
       }
 
+      // If the incoming message belongs to the currently open chat window
       if (String(newMessage.threadId) === String(activeThreadRef.current)) {
         addMessageIfNew(newMessage);
         
-        // Scroll to bottom for THIS specific new message
         setTimeout(() => {
           messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
         }, 100);
@@ -235,7 +238,8 @@ export default function Chat() {
           setFirstUnreadId(null); 
         }, 3000); 
         
-      } else if (user.role === 'admin') {
+      } else if (isAdminOrStaff) {
+        // If it's for a different chat, increase unread badge
         toast.success(`New message from ${newMessage.senderName}`);
         setUnreadCounts(prev => ({ ...prev, [newMessage.threadId]: (prev[newMessage.threadId] || 0) + 1 }));
       }
@@ -244,7 +248,7 @@ export default function Chat() {
     const handleChatCleared = ({ threadId }) => {
       if (String(threadId) === String(activeThreadRef.current)) {
         setMessages([]);
-        if (user.role !== 'admin') hasSentFirstMessageRef.current = false;
+        if (!isAdminOrStaff) hasSentFirstMessageRef.current = false;
         toast.success('Chat cleared');
       }
     };
@@ -265,6 +269,7 @@ export default function Chat() {
         setTypingUser(userName);
       }
     };
+    
     const handleStopTyping = ({ threadId }) => {
       if (String(threadId) === String(activeThreadRef.current)) {
         setIsTyping(false);
@@ -277,10 +282,6 @@ export default function Chat() {
       setContacts(prev => prev.map(c => ({ ...c, lastMessageText: null, lastMessageAt: null })));
       setUnreadCounts({}); 
       toast.success('All chats have been cleared');
-    };
-
-    const handleClearAllError = (msg) => {
-      toast.error(msg || 'Failed to clear all chats');
     };
 
     const handleChatRead = ({ threadId }) => {
@@ -303,7 +304,6 @@ export default function Chat() {
     socket.on('typing', handleTyping);
     socket.on('stop_typing', handleStopTyping);
     socket.on('all_chats_cleared', handleAllChatsCleared);
-    socket.on('clear_all_chats_error', handleClearAllError);
     socket.on('chat_read', handleChatRead); 
 
     return () => {
@@ -319,13 +319,12 @@ export default function Chat() {
       socket.off('typing', handleTyping);
       socket.off('stop_typing', handleStopTyping);
       socket.off('all_chats_cleared', handleAllChatsCleared);
-      socket.off('clear_all_chats_error', handleClearAllError);
       socket.off('chat_read', handleChatRead); 
       if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
       if (markReadTimeoutRef.current) clearTimeout(markReadTimeoutRef.current);
       socket.disconnect();
     };
-  }, [user, navigate, getUserId, addMessageIfNew]);
+  }, [user, navigate, getUserId, addMessageIfNew, isAdminOrStaff]);
 
   const handleOpenChat = (contact) => {
     setActiveContact(contact);
@@ -372,7 +371,8 @@ export default function Chat() {
 
     socket.emit('send_message', messageData);
 
-    if (user.role === 'admin') {
+    // Update contacts instantly for BOTH Admin and Staff
+    if (isAdminOrStaff) {
       setContacts(prev => {
         const updated = prev.map(c => 
           String(c._id) === String(activeContact._id) 
@@ -395,7 +395,8 @@ export default function Chat() {
     setMessage('');
     socket.emit('stop_typing', { threadId: activeContact._id, userId });
 
-    if (user.role !== 'admin' && !hasSentFirstMessageRef.current) {
+    // ONLY auto-reply if they are NOT Admin and NOT Staff
+    if (!isAdminOrStaff && !hasSentFirstMessageRef.current) {
       hasSentFirstMessageRef.current = true;
       setTimeout(() => {
         socket.emit('send_message', {
@@ -407,7 +408,7 @@ export default function Chat() {
   };
 
   const handleQuickCommand = async (command) => {
-    if (user?.role === 'admin' || !activeContact || !user) return;
+    if (isAdminOrStaff || !activeContact || !user) return;
     const userId = getUserId();
     
     socket.emit('send_message', { senderId: userId, senderName: user.name, senderRole: user.role, threadId: userId, text: command.question });
@@ -429,6 +430,7 @@ export default function Chat() {
 
   const handleContextMenu = (e, contact) => {
     e.preventDefault();
+    // Only Admin can open context menu to hard-delete chats
     if (user?.role === 'admin') setContextMenu({ x: e.clientX, y: e.clientY, contact });
   };
 
@@ -507,7 +509,7 @@ export default function Chat() {
             <h2 className="text-base md:text-lg font-black tracking-widest uppercase text-white">Support Center</h2>
             <span className="text-[9px] md:text-[10px] text-emerald-400 font-bold uppercase tracking-widest flex items-center gap-1">
               <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></span> 
-              {user?.role === 'admin' ? 'Live Chat' : "We're online"}
+              {isAdminOrStaff ? 'Live Chat' : "We're online"}
             </span>
           </div>
         </div>
@@ -521,17 +523,19 @@ export default function Chat() {
 
       <main className="flex-1 relative z-10 max-w-6xl mx-auto w-full p-2 md:p-6 flex flex-col md:flex-row gap-4 md:gap-6 min-h-0 h-full overflow-hidden">
 
-        {user?.role === 'admin' && (
+        {isAdminOrStaff && (
           <aside className={`w-full md:w-72 lg:w-80 bg-zinc-900 border border-zinc-800 rounded-2xl flex flex-col shrink-0 shadow-2xl overflow-hidden h-full ${isMobileChatOpen ? 'hidden md:flex' : 'flex'}`}>
             
             <div className="p-4 border-b border-zinc-800 bg-zinc-950/50 shrink-0 flex justify-between items-center">
               <h3 className="text-xs font-bold text-zinc-500 uppercase tracking-widest">Active Personnel</h3>
-              <button 
-                onClick={handleClearAllChats}
-                className="text-[10px] font-bold uppercase tracking-wider text-red-500 hover:text-white bg-red-600/10 hover:bg-red-600 px-3 py-1.5 rounded transition-colors"
-              >
-                Clear All
-              </button>
+              {user?.role === 'admin' && (
+                <button 
+                  onClick={handleClearAllChats}
+                  className="text-[10px] font-bold uppercase tracking-wider text-red-500 hover:text-white bg-red-600/10 hover:bg-red-600 px-3 py-1.5 rounded transition-colors"
+                >
+                  Clear All
+                </button>
+              )}
             </div>
 
             <div className="flex-1 min-h-0 overflow-y-auto p-3 space-y-2">
@@ -589,13 +593,13 @@ export default function Chat() {
           </aside>
         )}
 
-        <section className={`flex-1 min-w-0 min-h-0 bg-zinc-900 border border-zinc-800 rounded-2xl flex-col overflow-hidden shadow-2xl relative ${user?.role === 'admin' && !isMobileChatOpen ? 'hidden md:flex' : 'flex'}`}>
+        <section className={`flex-1 min-w-0 min-h-0 bg-zinc-900 border border-zinc-800 rounded-2xl flex-col overflow-hidden shadow-2xl relative ${isAdminOrStaff && !isMobileChatOpen ? 'hidden md:flex' : 'flex'}`}>
 
           {activeContact && (
             <div className="p-3 md:p-4 border-b border-zinc-800 bg-zinc-950/50 flex justify-between items-center shrink-0">
               <div className="flex items-center gap-3">
                 
-                {user?.role === 'admin' && (
+                {isAdminOrStaff && (
                   <button
                     onClick={() => {
                       setIsMobileChatOpen(false);
@@ -616,17 +620,17 @@ export default function Chat() {
                 </div>
                 
                 <div>
-                  <span className="font-bold text-white text-sm">{user?.role === 'admin' ? activeContact.name : 'Royal Service Center'}</span>
+                  <span className="font-bold text-white text-sm">{isAdminOrStaff ? activeContact.name : 'Royal Service Center'}</span>
                   <p className="text-[10px] text-zinc-500">
                     {isTyping 
                       ? `${typingUser} is typing...` 
-                      : (user?.role === 'admin' ? (activeContact.isOnline ? 'online' : 'offline') : 'online')}
+                      : (isAdminOrStaff ? (activeContact.isOnline ? 'online' : 'offline') : 'online')}
                   </p>
                 </div>
               </div>
 
               <div className="flex items-center gap-3">
-                {user?.role === 'admin' && activeContact.phone && (
+                {isAdminOrStaff && activeContact.phone && (
                   <span className="text-xs text-zinc-400 font-medium hidden sm:block">
                     {activeContact.phone}
                   </span>
@@ -647,7 +651,7 @@ export default function Chat() {
           <div ref={messagesContainerRef} className="flex-1 min-h-0 p-4 md:p-6 overflow-y-auto space-y-4 md:space-y-6">
             {!activeContact ? (
               <div className="h-full flex items-center justify-center text-zinc-500 text-sm font-medium text-center px-4">
-                {user?.role === 'admin' ? 'Select a contact to begin transmission.' : 'Connecting to Command Center...'}
+                {isAdminOrStaff ? 'Select a contact to begin transmission.' : 'Connecting to Command Center...'}
               </div>
             ) : messages.length === 0 ? (
               <div className="h-full flex items-center justify-center text-zinc-500 text-sm font-medium text-center px-4">
@@ -695,7 +699,7 @@ export default function Chat() {
             <div ref={messagesEndRef} />
           </div>
 
-          {user?.role !== 'admin' && (
+          {!isAdminOrStaff && (
             <div className="px-3 md:px-4 pb-2 bg-zinc-950/40 shrink-0">
               <div className="flex gap-2 overflow-x-auto py-2 hide-scrollbar">
                 {quickCommands.map((cmd) => (
