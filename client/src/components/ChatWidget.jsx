@@ -306,7 +306,7 @@ export default function ChatWidget() {
             <button 
               onClick={() => {
                 setIsOpen(false);
-                setActiveContact(null);
+                // 🛠️ FIX 1: Removed setActiveContact(null) so contact data persists when closing
                 activeThreadRef.current = null;
                 if (markReadTimeoutRef.current) clearTimeout(markReadTimeoutRef.current);
               }} 
@@ -433,6 +433,11 @@ export default function ChatWidget() {
               return;
             }
             setIsOpen(true);
+            
+            // 🛠️ FIX 2: Re-establish active contact when reopening (bulletproof against edge cases)
+            if (!activeContact) {
+              setActiveContact({ _id: getUserId(), name: 'Royal Support', role: 'admin' });
+            }
           }}
           className="relative flex items-center gap-2 bg-gradient-to-br from-red-500 via-red-600 to-red-700 hover:from-red-600 hover:via-red-700 hover:to-red-800 text-white pl-3 pr-5 py-3 rounded-full shadow-2xl pointer-events-auto transition-all duration-300 hover:scale-105"
         >
