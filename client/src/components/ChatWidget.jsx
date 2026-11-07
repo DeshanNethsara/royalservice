@@ -23,13 +23,18 @@ export default function ChatWidget() {
   const [isTyping, setIsTyping] = useState(false);
   const [typingUser, setTypingUser] = useState('');
   
+  // 🚨 NEW: Track the ID of the first unread message to render a separator
+  const [firstUnreadId, setFirstUnreadId] = useState(null);
+  
   const activeThreadRef = useRef(null);
   const messagesEndRef = useRef(null);
   const messagesContainerRef = useRef(null);
   const typingTimeoutRef = useRef(null);
   const hasSentFirstMessageRef = useRef(false);
+  const firstUnreadRef = useRef(null); // Ref for scrolling to the unread separator
+  const markReadTimeoutRef = useRef(null); // Ref for the delayed read timer
   
-  // 🚨 FIX: Track if the widget is open synchronously for socket events
+  // Track if the widget is open synchronously for socket events
   const isOpenRef = useRef(isOpen);
   useEffect(() => {
     isOpenRef.current = isOpen;
@@ -89,9 +94,26 @@ export default function ChatWidget() {
       }
     });
 
+    // 🚨 WHATSAPP FIX 1: When history loads, find the first unread message to scroll to
     const handleChatHistory = (history) => {
-      setMessages(history || []);
-      hasSentFirstMessageRef.current = (history || []).some(m => String(m.senderId) === String(userId) && m.senderRole !== 'bot');
+      const sortedHistory = history || [];
+      setMessages(sortedHistory);
+      
+      hasSentFirstMessageRef.current = sortedHistory.some(m => String(m.senderId) === String(userId) && m.senderRole !== 'bot');
+      
+      // Find the first message sent by the OTHER person that is NOT read
+      const firstUnread = sortedHistory.find(m => String(m.senderId) !== String(userId) && !m.isRead);
+      if (firstUnread) {
+        setFirstUnreadId(firstUnread._id);
+        setTimeout(() => {
+          firstUnreadRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }, 100);
+      } else {
+        setFirstUnreadId(null);
+        setTimeout(() => {
+          messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+        }, 100);
+      }
     };
 
     const handleIncomingMessage = (newMessage) => {
@@ -105,8 +127,14 @@ export default function ChatWidget() {
           const audio = new Audio('/notification.mp3');
           audio.play().catch(() => {});
         } else {
-          // Widget is open: Mark as read immediately
-          socket.emit('mark_read', { threadId: newMessage.threadId, userId });
+          // Widget is open: scroll to bottom, delay mark read
+          setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
+          
+          if (markReadTimeoutRef.current) clearTimeout(markReadTimeoutRef.current);
+          markReadTimeoutRef.current = setTimeout(() => {
+            socket.emit('mark_read', { threadId: newMessage.threadId, userId });
+            setFirstUnreadId(null);
+          }, 3000);
         }
       }
 
@@ -141,30 +169,41 @@ export default function ChatWidget() {
       socket.off('receive_message', handleIncomingMessage);
       socket.off('typing', handleTyping);
       socket.off('stop_typing', handleStopTyping);
+      if (markReadTimeoutRef.current) clearTimeout(markReadTimeoutRef.current);
       socket.disconnect();
     };
   }, [isUserLoggedIn, user, getUserId, addMessageIfNew]);
 
-  // 🚨 FIX: Trigger mark_read when the user opens the widget
+  // 🚨 WHATSAPP FIX 2: Delay marking as read when opening the widget
   useEffect(() => {
     if (isOpen && activeContact && user?.role !== 'admin') {
       activeThreadRef.current = activeContact._id;
       
-      // Tell backend to clear the unread badge
-      socket.emit('mark_read', { threadId: activeContact._id, userId: getUserId() });
+      // Clear local unread badge visually immediately
+      setUnreadCount(0);
+      
       socket.emit('fetch_history', activeContact._id);
       
-      setUnreadCount(0);
-      setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
+      // Delay confirming the read receipt on the backend
+      if (markReadTimeoutRef.current) clearTimeout(markReadTimeoutRef.current);
+      markReadTimeoutRef.current = setTimeout(() => {
+        socket.emit('mark_read', { threadId: activeContact._id, userId: getUserId() });
+        setFirstUnreadId(null); // Remove visual divider
+      }, 5000); // 5 seconds
+      
     } else if (!isOpen) {
       // Forget active thread when closed
       activeThreadRef.current = null;
+      if (markReadTimeoutRef.current) clearTimeout(markReadTimeoutRef.current);
     }
   }, [isOpen, activeContact, user?.role, getUserId]);
 
+  // Keep scroll at bottom if someone is typing
   useEffect(() => {
-    if (isOpen) messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, isOpen, isTyping]);
+    if (isOpen && isTyping) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [isTyping, isOpen]);
 
   const handleSendMessage = (e) => {
     e.preventDefault();
@@ -178,6 +217,11 @@ export default function ChatWidget() {
       threadId: activeContact._id,
       text: message.trim()
     });
+
+    // Scroll to bottom immediately upon sending a message
+    setTimeout(() => {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }, 100);
 
     setMessage('');
     socket.emit('stop_typing', { threadId: activeContact._id, userId });
@@ -199,6 +243,10 @@ export default function ChatWidget() {
     
     socket.emit('send_message', { senderId: userId, senderName: user.name, senderRole: user.role, threadId: userId, text: cmd.question });
     
+    setTimeout(() => {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }, 100);
+
     setTimeout(async () => {
       const reply = await getAutoReply(cmd.question);
       socket.emit('send_message', { senderId: 'bot', senderName: 'Royal Service Center', senderRole: 'bot', threadId: userId, text: reply });
@@ -239,7 +287,15 @@ export default function ChatWidget() {
                 </p>
               </div>
             </div>
-            <button onClick={() => setIsOpen(false)} className="text-zinc-400 hover:text-white transition-colors p-1">
+            <button 
+              onClick={() => {
+                setIsOpen(false);
+                setActiveContact(null);
+                activeThreadRef.current = null;
+                if (markReadTimeoutRef.current) clearTimeout(markReadTimeoutRef.current);
+              }} 
+              className="text-zinc-400 hover:text-white transition-colors p-1"
+            >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
             </button>
           </div>
@@ -257,19 +313,34 @@ export default function ChatWidget() {
             {messages.map((msg, index) => {
               const isMe = String(msg.senderId) === String(getUserId());
               const isBot = msg.senderRole === 'bot';
+              const isFirstUnread = msg._id === firstUnreadId;
+
               return (
-                <div key={msg._id || index} className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}>
-                  <span className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider mb-1">
-                    {isMe ? 'You' : isBot ? 'Bot' : msg.senderName}
-                  </span>
-                  <div className={`max-w-[85%] p-3 rounded-2xl text-sm ${
-                    isMe ? 'bg-red-600 text-white rounded-tr-sm shadow-md' 
-                    : isBot ? 'bg-purple-100 border border-purple-200 text-purple-900 rounded-tl-sm'
-                    : 'bg-white border border-zinc-200 text-zinc-700 rounded-tl-sm shadow-sm'
-                  }`}>
-                    <p className="whitespace-pre-wrap">{msg.text}</p>
+                <React.Fragment key={msg._id || index}>
+                  {/* 🚨 WHATSAPP FIX 3: Render visual separator for unread messages (Light Mode) */}
+                  {isFirstUnread && (
+                    <div ref={firstUnreadRef} className="flex items-center justify-center my-6">
+                      <div className="h-px bg-zinc-300 flex-1"></div>
+                      <span className="px-3 py-1 bg-red-50 text-red-600 text-[10px] font-black uppercase tracking-widest rounded-full border border-red-200 shadow-sm">
+                        Unread Messages
+                      </span>
+                      <div className="h-px bg-zinc-300 flex-1"></div>
+                    </div>
+                  )}
+
+                  <div className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}>
+                    <span className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider mb-1">
+                      {isMe ? 'You' : isBot ? 'Bot' : msg.senderName}
+                    </span>
+                    <div className={`max-w-[85%] p-3 rounded-2xl text-sm ${
+                      isMe ? 'bg-red-600 text-white rounded-tr-sm shadow-md' 
+                      : isBot ? 'bg-purple-100 border border-purple-200 text-purple-900 rounded-tl-sm'
+                      : 'bg-white border border-zinc-200 text-zinc-700 rounded-tl-sm shadow-sm'
+                    }`}>
+                      <p className="whitespace-pre-wrap">{msg.text}</p>
+                    </div>
                   </div>
-                </div>
+                </React.Fragment>
               );
             })}
             <div ref={messagesEndRef} />
