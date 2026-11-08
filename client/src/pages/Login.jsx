@@ -85,7 +85,7 @@ export default function Login() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Check if the URL contains a reset token (e.g., /login?resetToken=abc123)
+  // Check if the URL contains a reset token OR if Homepage asked us to open register
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const token = params.get('resetToken');
@@ -93,6 +93,14 @@ export default function Login() {
       setResetToken(token);
       setIsRegister(false);
       setIsForgotPassword(false);
+      return;
+    }
+
+    // 🚨 Open register form if Homepage's "Book Now" redirected us there
+    if (location.state?.mode === 'register') {
+      setIsRegister(true);
+      setIsForgotPassword(false);
+      setResetToken(null);
     }
   }, [location]);
 

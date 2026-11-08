@@ -175,6 +175,15 @@ export default function Homepage() {
     }
   };
 
+  // 🚨 NEW: Navbar "Book Now" → opens REGISTER form (not login)
+  const handleBookNowRegister = () => {
+    if (user) {
+      navigate('/booking');
+    } else {
+      navigate('/login', { state: { mode: 'register', from: '/booking' } });
+    }
+  };
+
   const handleLogout = () => {
     logout();
     toast.success('Logged out securely.');
@@ -294,7 +303,8 @@ export default function Homepage() {
             ) : (
               <>
                 <Link to="/login" className="text-zinc-600 hover:text-red-600 text-sm font-bold tracking-wide transition-colors">LOGIN</Link>
-                <button onClick={() => handleBookNow()} className="bg-red-600 hover:bg-red-700 text-white px-6 py-3 rounded font-bold text-sm tracking-wide transition-all shadow-lg hover:shadow-xl flex items-center gap-2">
+                {/* 🚨 Changed: opens REGISTER form */}
+                <button onClick={handleBookNowRegister} className="bg-red-600 hover:bg-red-700 text-white px-6 py-3 rounded font-bold text-sm tracking-wide transition-all shadow-lg hover:shadow-xl flex items-center gap-2">
                   BOOK NOW
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" /></svg>
                 </button>
@@ -334,7 +344,8 @@ export default function Homepage() {
               ) : (
                 <div className="pt-2 pb-2 space-y-3">
                   <Link to="/login" onClick={() => setIsMobileMenuOpen(false)} className="block w-full text-center px-4 py-3 text-zinc-700 border border-zinc-300 rounded-lg font-bold hover:bg-zinc-50">LOGIN</Link>
-                  <button onClick={() => { setIsMobileMenuOpen(false); handleBookNow(); }} className="w-full bg-red-600 hover:bg-red-700 text-white px-4 py-3 rounded-lg font-bold flex justify-center items-center gap-2 shadow-lg">
+                  {/* 🚨 Changed: opens REGISTER form */}
+                  <button onClick={() => { setIsMobileMenuOpen(false); handleBookNowRegister(); }} className="w-full bg-red-600 hover:bg-red-700 text-white px-4 py-3 rounded-lg font-bold flex justify-center items-center gap-2 shadow-lg">
                     BOOK NOW <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" /></svg>
                   </button>
                 </div>
