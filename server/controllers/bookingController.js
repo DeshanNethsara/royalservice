@@ -505,7 +505,7 @@ export const updateBookingStatus = async (req, res) => {
       }
 
       try {
-        const populated = await Booking.findById(booking._id).populate('user_id', 'name email').populate('vehicle_id').populate('service_id').populate('staff_id', 'name');
+        const populated = await Booking.findById(booking._id).populate('user_id', 'name email phone').populate('vehicle_id').populate('service_id').populate('staff_id', 'name');
         const fullReport = await Report.findById(existingReport._id).populate('generated_by');
 
         if (populated.user_id?.email) {
@@ -546,7 +546,7 @@ export const rateBooking = async (req, res) => {
 
 export const generateServiceRecordPDF = async (req, res) => {
   try {
-    const booking = await Booking.findById(req.params.id).populate('user_id').populate('vehicle_id').populate('service_id').populate('staff_id', 'name');
+    const booking = await Booking.findById(req.params.id).populate('user_id', 'name email phone').populate('vehicle_id').populate('service_id').populate('staff_id', 'name');
     if (!booking) return res.status(404).json({ message: 'Booking not found' });
     if (booking.status !== 'Completed') return res.status(400).json({ message: 'Record only for completed bookings' });
 
