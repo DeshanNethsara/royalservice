@@ -1,9 +1,9 @@
 import React, { useEffect, useState, useContext, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { Helmet } from 'react-helmet';
 import axiosClient from '../api/axiosClient';
 import { AuthContext } from '../context/AuthContext';
 import toast from 'react-hot-toast';
-// 🚨 Import Chat Widget
 import ChatWidget from '../components/ChatWidget';
 
 // ==========================================================
@@ -175,7 +175,6 @@ export default function Homepage() {
     }
   };
 
-  // 🚨 NEW: Navbar "Book Now" → opens REGISTER form (not login)
   const handleBookNowRegister = () => {
     if (user) {
       navigate('/booking');
@@ -217,6 +216,36 @@ export default function Homepage() {
 
   return (
     <div className="min-h-screen bg-white font-sans text-zinc-900">
+      <Helmet>
+        <title>Royal Car Service Center | Premium Auto Repair in Colombo</title>
+        <meta name="description" content="Sri Lanka's premier automotive service provider in Colombo 05. Expert car detailing, repairs, wash & grooming, and diagnostics. Book your service today." />
+        <link rel="canonical" href="https://www.royalservice.tech/" />
+        <script type="application/ld+json">
+          {JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "AutoRepair",
+            "name": "Royal Service Center",
+            "image": "https://www.royalservice.tech/logo.png",
+            "@id": "https://www.royalservice.tech",
+            "url": "https://www.royalservice.tech",
+            "telephone": "+94743658500",
+            "address": {
+              "@type": "PostalAddress",
+              "streetAddress": "13/5 Service Road",
+              "addressLocality": "Colombo",
+              "postalCode": "00500",
+              "addressCountry": "LK"
+            },
+            "openingHoursSpecification": {
+              "@type": "OpeningHoursSpecification",
+              "dayOfWeek": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"],
+              "opens": "08:00",
+              "closes": "18:00"
+            }
+          })}
+        </script>
+      </Helmet>
+
       {/* Top Bar */}
       <div className="bg-zinc-900 text-white text-xs md:text-sm py-2">
         <div className="max-w-7xl mx-auto px-4 md:px-6 flex justify-between items-center">
@@ -245,8 +274,10 @@ export default function Homepage() {
           <div className="flex items-center gap-2 md:gap-3 cursor-pointer" onClick={scrollToTop} role="button" aria-label="Go to homepage">
             <img src="/logo.png" alt="Royal Service Center Logo" className="w-9 h-9 md:w-12 md:h-12 object-contain rounded-lg" />
             <div className="block">
-              <h1 className="text-lg md:text-xl font-black text-zinc-900 tracking-tight leading-none">ROYAL</h1>
-              <span className="text-[10px] md:text-xs font-bold text-red-600 tracking-widest">SERVICE CENTER</span>
+              <h1 className="flex flex-col">
+                <span className="text-lg md:text-xl font-black text-zinc-900 tracking-tight leading-none">ROYAL CAR SERVICE</span>
+                <span className="text-[10px] md:text-xs font-bold text-red-600 tracking-widest">PREMIUM AUTO REPAIR COLOMBO</span>
+              </h1>
             </div>
           </div>
 
@@ -303,7 +334,6 @@ export default function Homepage() {
             ) : (
               <>
                 <Link to="/login" className="text-zinc-600 hover:text-red-600 text-sm font-bold tracking-wide transition-colors">LOGIN</Link>
-                {/* 🚨 Changed: opens REGISTER form */}
                 <button onClick={handleBookNowRegister} className="bg-red-600 hover:bg-red-700 text-white px-6 py-3 rounded font-bold text-sm tracking-wide transition-all shadow-lg hover:shadow-xl flex items-center gap-2">
                   BOOK NOW
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" /></svg>
@@ -344,7 +374,6 @@ export default function Homepage() {
               ) : (
                 <div className="pt-2 pb-2 space-y-3">
                   <Link to="/login" onClick={() => setIsMobileMenuOpen(false)} className="block w-full text-center px-4 py-3 text-zinc-700 border border-zinc-300 rounded-lg font-bold hover:bg-zinc-50">LOGIN</Link>
-                  {/* 🚨 Changed: opens REGISTER form */}
                   <button onClick={() => { setIsMobileMenuOpen(false); handleBookNowRegister(); }} className="w-full bg-red-600 hover:bg-red-700 text-white px-4 py-3 rounded-lg font-bold flex justify-center items-center gap-2 shadow-lg">
                     BOOK NOW <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" /></svg>
                   </button>
@@ -431,7 +460,7 @@ export default function Homepage() {
             </div>
             <div className="relative mt-8 lg:mt-0">
               <div className="aspect-square rounded-2xl overflow-hidden shadow-2xl">
-                <img src="https://images.pexels.com/photos/3846228/pexels-photo-3846228.jpeg?auto=compress&cs=tinysrgb&w=1200" alt="Expert Sri Lankan mechanic" className="w-full h-full object-cover" />
+                <img src="https://images.pexels.com/photos/3846228/pexels-photo-3846228.jpeg?auto=compress&cs=tinysrgb&w=1200" alt="Expert auto mechanic performing engine diagnostics at Royal Service Center Colombo" className="w-full h-full object-cover" />
               </div>
               <div className="absolute -bottom-6 -left-4 md:-bottom-8 md:-left-8 bg-red-600 text-white p-4 md:p-8 rounded-xl shadow-2xl max-w-[200px] md:max-w-xs">
                 <div className="text-4xl md:text-5xl font-black mb-1 md:mb-2">15+</div>
@@ -570,8 +599,8 @@ export default function Homepage() {
               <div className="flex items-center gap-2 mb-4 md:mb-6">
                 <img src="/logo.png" alt="Logo" className="w-10 h-10 md:w-12 md:h-12 object-contain rounded-lg" />
                 <div>
-                  <h4 className="text-base md:text-lg font-black text-white tracking-tight leading-none">ROYAL</h4>
-                  <span className="text-[10px] md:text-xs font-bold text-red-500 tracking-widest">SERVICE CENTER</span>
+                  <h4 className="text-base md:text-lg font-black text-white tracking-tight leading-none">ROYAL CAR SERVICE</h4>
+                  <span className="text-[10px] md:text-xs font-bold text-red-500 tracking-widest">PREMIUM AUTO REPAIR</span>
                 </div>
               </div>
               <p className="text-zinc-400 text-xs md:text-sm leading-relaxed">Sri Lanka's premier automotive service provider, delivering excellence since 2009.</p>
@@ -612,7 +641,6 @@ export default function Homepage() {
         </div>
       </footer>
 
-      {/* 🚨 Always render the widget */}
       <ChatWidget />
 
     </div>
