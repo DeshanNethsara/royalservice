@@ -2,6 +2,7 @@ import React from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { AuthProvider } from './context/AuthContext';
+import { HelmetProvider } from 'react-helmet-async'; // 🚨 NEW: Import HelmetProvider
 
 import Homepage from './pages/Homepage';
 import Login from './pages/Login';
@@ -17,25 +18,28 @@ import ChatWidget from './components/ChatWidget';
 
 export default function App() {
   return (
-    <AuthProvider>
-      <BrowserRouter>
-        <Toaster />
+    // 🚨 NEW: Wrap the entire app in HelmetProvider
+    <HelmetProvider>
+      <AuthProvider>
+        <BrowserRouter>
+          <Toaster />
 
-        <Routes>
-          <Route path="/" element={<Homepage />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/booking" element={<BookingFlow />} />
-          <Route path="/dashboard" element={<CustomerDashboard />} />
-          <Route path="/admin" element={<AdminPanel />} />
-          <Route path="/staff" element={<StaffDashboard />} />
-          <Route path="/profile" element={<Profile />} />
-          <Route path="/chat" element={<Chat />} />
-        </Routes>
+          <Routes>
+            <Route path="/" element={<Homepage />} />
+            <Route path="/login" element={<Login />} />
+            <Route path="/booking" element={<BookingFlow />} />
+            <Route path="/dashboard" element={<CustomerDashboard />} />
+            <Route path="/admin" element={<AdminPanel />} />
+            <Route path="/staff" element={<StaffDashboard />} />
+            <Route path="/profile" element={<Profile />} />
+            <Route path="/chat" element={<Chat />} />
+          </Routes>
 
-        {/* 🚨 Place it here, outside Routes but inside BrowserRouter, so it floats globally! */}
-        {/* <ChatWidget /> */}
-        
-      </BrowserRouter>
-    </AuthProvider>
+          {/* 🚨 Place it here, outside Routes but inside BrowserRouter, so it floats globally! */}
+          {/* <ChatWidget /> */}
+          
+        </BrowserRouter>
+      </AuthProvider>
+    </HelmetProvider>
   );
 }
