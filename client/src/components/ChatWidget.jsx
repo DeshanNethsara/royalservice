@@ -64,8 +64,12 @@ export default function ChatWidget() {
       const response = await axiosClient.get('/bookings/my-bookings');
       const bookings = response.data;
       if (!bookings || bookings.length === 0) return "You don't have any bookings yet. Click 'New Booking' on the dashboard!";
-      const recentBookings = bookings.slice(0, 3).map(b => `• ${b.service_id?.name || 'Service'} - Status: ${b.status}`).join('\n');
-      return `Here are your recent bookings:\n\n${recentBookings}`;
+      const recentBookings = bookings.slice(0, 3).map(b => `• ${b.service_id?.name || 'Service'}Status: 
+${b.status}`).join('
+');
+      return `Here are your recent bookings:
+
+${recentBookings}`;
     } catch (error) {
       return "I'm having trouble accessing your booking data.";
     }
@@ -74,17 +78,39 @@ export default function ChatWidget() {
   const getAutoReply = async (question) => {
     const q = question.toLowerCase();
     if (q.includes('status') || q.includes('track') || q.includes('check')) return await fetchRealBookingStatus();
-    if (q.includes('book') || q.includes('appointment')) return `📅 To book:\n1. Click "NEW BOOKING" on the dashboard.\n2. Select your vehicle and service.\n3. Choose a date and time.\n4. Confirm your booking!`;
-    if (q.includes('contact') || q.includes('phone')) return `📞 Phone: +94 74 365 8500\nEmail: admin@royalservice.tech`;
+    if (q.includes('book') || q.includes('appointment')) return `📅 To book:
+1. Click "NEW BOOKING" on the dashboard.
+2. Select your vehicle and service.
+3. Choose a date and time.
+4. Confirm your booking!`;
+    if (q.includes('contact') || q.includes('phone')) return `📞 Phone: +94 74 365 8500
+Email: admin@royalservice.tech`;
     if (q.includes('service') || q.includes('offer')) return `🔧 We offer: Full Service, Oil Change, Brake Service, AC Service, Tires, and more!`;
-    if (q.includes('hour') || q.includes('open')) return `🕒 Hours:\nMon-Fri: 8AM - 6PM\nSat: 9AM - 4PM\nSun: Closed`;
+    if (q.includes('hour') || q.includes('open')) return `🕒 Hours:
+Mon-Fri: 8AM - 6PM
+Sat: 9AM - 4PM
+Sun: Closed`;
     return `Thank you for your message! A representative will be with you shortly. For immediate assistance, call +94 74 365 8500.`;
   };
 
+  // 🚨 UPDATED: Stricter duplicate checking to prevent visual double messages
   const addMessageIfNew = useCallback((newMessage) => {
     setMessages((prev) => {
-      const exists = prev.some(msg => msg._id === newMessage._id || (msg.text === newMessage.text && Math.abs(new Date(msg.createdAt) - new Date(newMessage.createdAt)) < 1000));
-      if (exists) return prev;
+      // 1. Check if exact ID exists
+      const idExists = prev.some(msg => msg._id === newMessage._id);
+      if (idExists) return prev;
+
+      // 2. Check if SAME TEXT sent by SAME USER within the last 2 seconds
+      // This prevents the optimistic update and the socket broadcast from duplicating
+      const duplicateExists = prev.some(msg => 
+        msg.text === newMessage.text && 
+        String(msg.senderId) === String(newMessage.senderId) &&
+        Math.abs(new Date(msg.createdAt).getTime() - new Date(newMessage.createdAt).getTime()) < 2000
+      );
+      
+      if (duplicateExists) return prev;
+
+      // 3. If truly new, add it and sort
       return [...prev, newMessage].sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
     });
   }, []);
@@ -238,7 +264,9 @@ export default function ChatWidget() {
       setTimeout(() => {
         socket.emit('send_message', {
           senderId: 'bot', senderName: 'Royal Service Center', senderRole: 'bot', threadId: userId,
-          text: `Thank you for your message! Our team will reply shortly.\n\nYou can also use the quick commands below.`
+          text: `Thank you for your message! Our team will reply shortly.
+
+You can also use the quick commands below.`
         });
       }, 1000);
     }
