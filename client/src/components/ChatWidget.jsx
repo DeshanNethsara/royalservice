@@ -64,12 +64,8 @@ export default function ChatWidget() {
       const response = await axiosClient.get('/bookings/my-bookings');
       const bookings = response.data;
       if (!bookings || bookings.length === 0) return "You don't have any bookings yet. Click 'New Booking' on the dashboard!";
-      const recentBookings = bookings.slice(0, 3).map(b => `• ${b.service_id?.name || 'Service'}Status: 
-${b.status}`).join('
-');
-      return `Here are your recent bookings:
-
-${recentBookings}`;
+      const recentBookings = bookings.slice(0, 3).map(b => `• ${b.service_id?.name || 'Service'} Status: ${b.status}`).join('\n');
+      return `Here are your recent bookings:\n\n${recentBookings}`;
     } catch (error) {
       return "I'm having trouble accessing your booking data.";
     }
@@ -78,18 +74,10 @@ ${recentBookings}`;
   const getAutoReply = async (question) => {
     const q = question.toLowerCase();
     if (q.includes('status') || q.includes('track') || q.includes('check')) return await fetchRealBookingStatus();
-    if (q.includes('book') || q.includes('appointment')) return `📅 To book:
-1. Click "NEW BOOKING" on the dashboard.
-2. Select your vehicle and service.
-3. Choose a date and time.
-4. Confirm your booking!`;
-    if (q.includes('contact') || q.includes('phone')) return `📞 Phone: +94 74 365 8500
-Email: admin@royalservice.tech`;
+    if (q.includes('book') || q.includes('appointment')) return `📅 To book:\n1. Click "NEW BOOKING" on the dashboard.\n2. Select your vehicle and service.\n3. Choose a date and time.\n4. Confirm your booking!`;
+    if (q.includes('contact') || q.includes('phone')) return `📞 Phone: +94 74 365 8500\nEmail: admin@royalservice.tech`;
     if (q.includes('service') || q.includes('offer')) return `🔧 We offer: Full Service, Oil Change, Brake Service, AC Service, Tires, and more!`;
-    if (q.includes('hour') || q.includes('open')) return `🕒 Hours:
-Mon-Fri: 8AM - 6PM
-Sat: 9AM - 4PM
-Sun: Closed`;
+    if (q.includes('hour') || q.includes('open')) return `🕒 Hours:\nMon-Fri: 8AM - 6PM\nSat: 9AM - 4PM\nSun: Closed`;
     return `Thank you for your message! A representative will be with you shortly. For immediate assistance, call +94 74 365 8500.`;
   };
 
@@ -164,7 +152,7 @@ Sun: Closed`;
           markReadTimeoutRef.current = setTimeout(() => {
             socket.emit('mark_read', { threadId: newMessage.threadId, userId });
             setFirstUnreadId(null);
-          }, 3000);
+          }, 1000); // 🚨 UPDATED TO 1 SECOND
         }
       }
     };
@@ -211,7 +199,7 @@ Sun: Closed`;
       markReadTimeoutRef.current = setTimeout(() => {
         socket.emit('mark_read', { threadId: activeContact._id, userId: getUserId() });
         setFirstUnreadId(null);
-      }, 5000);
+      }, 1000); // 🚨 UPDATED TO 1 SECOND
       
     } else if (!isOpen) {
       activeThreadRef.current = null;
@@ -233,28 +221,20 @@ Sun: Closed`;
     const userId = getUserId();
     const messageText = message.trim();
     
-    const outgoingMsg = {
-      _id: Date.now().toString(),
-      senderId: userId,
-      senderName: user.name,
-      senderRole: user.role,
-      threadId: activeContact._id,
-      text: messageText,
-      createdAt: new Date().toISOString()
-    };
-    
-    addMessageIfNew(outgoingMsg);
-    
-    // Force instant scroll when user sends a message
-    setTimeout(() => scrollToBottom(true), 50);
-
-    socket.emit('send_message', {
+    // Do not insert an optimistic copy here. The server broadcasts the saved
+    // message back through Socket.IO, and handleIncomingMessage renders it once.
+    const messageData = {
       senderId: userId,
       senderName: user.name,
       senderRole: user.role,
       threadId: activeContact._id,
       text: messageText
-    });
+    };
+
+    socket.emit('send_message', messageData);
+    
+    // Force instant scroll when user sends a message
+    setTimeout(() => scrollToBottom(true), 50);
 
     setMessage('');
     socket.emit('stop_typing', { threadId: activeContact._id, userId });
@@ -264,9 +244,7 @@ Sun: Closed`;
       setTimeout(() => {
         socket.emit('send_message', {
           senderId: 'bot', senderName: 'Royal Service Center', senderRole: 'bot', threadId: userId,
-          text: `Thank you for your message! Our team will reply shortly.
-
-You can also use the quick commands below.`
+          text: `Thank you for your message! Our team will reply shortly.\n\nYou can also use the quick commands below.`
         });
       }, 1000);
     }
@@ -276,20 +254,9 @@ You can also use the quick commands below.`
     if (!activeContact || user?.role === 'admin') return;
     const userId = getUserId();
     
-    const outgoingMsg = {
-      _id: Date.now().toString(),
-      senderId: userId,
-      senderName: user.name,
-      senderRole: user.role,
-      threadId: userId,
-      text: cmd.question,
-      createdAt: new Date().toISOString()
-    };
-    
-    addMessageIfNew(outgoingMsg);
-    setTimeout(() => scrollToBottom(true), 50);
-
+    // The server echo is responsible for adding this message to the chat UI.
     socket.emit('send_message', { senderId: userId, senderName: user.name, senderRole: user.role, threadId: userId, text: cmd.question });
+    setTimeout(() => scrollToBottom(true), 50);
     
     setTimeout(async () => {
       const reply = await getAutoReply(cmd.question);
