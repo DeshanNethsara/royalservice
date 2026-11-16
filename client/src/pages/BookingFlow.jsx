@@ -264,7 +264,6 @@ export default function BookingFlow() {
       toast.success('Booking confirmed!');
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (err) {
-      // 🚨 The rate limit error from the backend will be displayed here
       toast.error(err.response?.data?.message || 'Error creating booking');
       if (err.response?.status === 409) { fetchBookingsForDate(slot.date); setStep(3); }
     } finally {
@@ -280,7 +279,7 @@ export default function BookingFlow() {
   ];
 
   return (
-    <div className="min-h-screen bg-zinc-50 p-3 md:p-6 font-sans text-zinc-900">
+    <div className="min-h-screen bg-zinc-50 p-3 md:p-6 font-sans text-zinc-900 pb-24 md:pb-6">
       <div className="max-w-3xl mx-auto bg-white p-4 md:p-12 rounded-2xl border border-zinc-200 shadow-xl mt-4 md:mt-10 relative overflow-hidden">
         
         {/* Top Accent */}
@@ -304,7 +303,7 @@ export default function BookingFlow() {
               {steps.map((s, index) => (
                 <React.Fragment key={s.number}>
                   <button
-                    onClick={() => goToStep(s.number)}
+                    onClick={() => { if (s.number <= maxStepReached) setStep(s.number); }}
                     disabled={s.number > maxStepReached}
                     className={`flex items-center gap-1.5 md:gap-2 px-2 md:px-3 py-1.5 md:py-2 rounded-lg text-[10px] md:text-xs font-bold transition-all whitespace-nowrap ${
                       step === s.number ? 'bg-red-600 text-white shadow-md' 
@@ -331,10 +330,10 @@ export default function BookingFlow() {
         <div className="relative z-10">
           {/* STEP 1 */}
           {step === 1 && (
-            <div className="animate-[fadeIn_0.4s_ease-out]">
+            <div className="animate-[fadeIn_0.4s_ease-out] pb-16 md:pb-20">
               <h3 className="text-base md:text-lg font-bold mb-4 md:mb-6 text-zinc-800">Step 1: Select Vehicle & Service</h3>
 
-              <div className="flex gap-2 md:gap-3 mb-6 md:mb-8 bg-zinc-100 p-1.5 md:p-2 rounded-xl border border-zinc-200">
+              <div className="flex gap-2 md:gap-3 mb-6 md:mb-8 bg-zinc-100 p-1.5 md:p-2 rounded-xl border border-zinc-200 sticky top-0 z-20 backdrop-blur-md bg-zinc-100/90">
                 {vehicleCategories.map((type) => (
                   <button
                     key={type}
@@ -364,22 +363,22 @@ export default function BookingFlow() {
                         key={svc._id}
                         onClick={() => setSelectedService(svc)}
                         className={`p-4 md:p-6 rounded-xl cursor-pointer transition-all flex flex-col justify-between ${
-                          isSelected ? 'border-2 border-red-600 bg-red-50 shadow-md' : 'border border-zinc-200 bg-white hover:border-red-600/50 hover:shadow-md'
+                          isSelected ? 'border-2 border-red-600 bg-red-50 shadow-md ring-4 ring-red-600/10' : 'border border-zinc-200 bg-white hover:border-red-600/50 hover:shadow-md'
                         }`}
                       >
                         <div>
                           <div className={`font-extrabold text-base md:text-lg mb-1 md:mb-2 uppercase ${isSelected ? 'text-red-700' : 'text-zinc-900'}`}>{svc.name}</div>
                           <div className="text-xs md:text-sm text-zinc-500 mb-3 md:mb-4 line-clamp-2">{svc.description}</div>
                         </div>
-                        <div className="flex items-center justify-between mt-auto">
+                        <div className="flex items-center justify-between mt-auto pt-4 border-t border-zinc-100">
                           <div className={`font-black text-sm md:text-base ${isSelected ? 'text-red-600' : 'text-zinc-900'}`}>
                             LKR {displayPrice.toLocaleString()}
                           </div>
-                          {isSelected && (
-                            <div className="w-5 h-5 md:w-7 md:h-7 rounded-full bg-red-600 flex items-center justify-center text-white">
-                              <svg className="w-3 h-3 md:w-5 md:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" /></svg>
-                            </div>
-                          )}
+                          <div className={`w-6 h-6 md:w-8 md:h-8 rounded-full border-2 flex items-center justify-center transition-colors ${
+                            isSelected ? 'bg-red-600 border-red-600 text-white' : 'border-zinc-300 text-transparent'
+                          }`}>
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" /></svg>
+                          </div>
                         </div>
                       </div>
                     );
@@ -389,13 +388,23 @@ export default function BookingFlow() {
                 </div>
               )}
 
-              <button
-                disabled={!selectedService}
-                onClick={goToNextStep}
-                className="mt-6 md:mt-8 w-full bg-red-600 hover:bg-red-700 text-white py-3 md:py-4 rounded-xl font-bold text-sm md:text-base tracking-wider disabled:opacity-50 transition-all shadow-md"
-              >
-                NEXT: VEHICLE DETAILS →
-              </button>
+              {/* 🚨 FLOATING NEXT BUTTON FOR STEP 1 */}
+              {selectedService && (
+                <div className="fixed bottom-0 left-0 right-0 p-4 md:p-6 bg-white/90 backdrop-blur-xl border-t border-zinc-200 shadow-[0_-10px_40px_rgba(0,0,0,0.1)] z-50 animate-[slideUp_0.3s_ease-out]">
+                  <div className="max-w-3xl mx-auto flex items-center justify-between gap-4">
+                    <div className="hidden sm:block min-w-0 flex-1">
+                      <div className="text-xs font-bold text-zinc-500 uppercase">Selected Service</div>
+                      <div className="text-sm font-black text-zinc-900 truncate">{selectedService.name}</div>
+                    </div>
+                    <button
+                      onClick={goToNextStep}
+                      className="w-full sm:w-auto bg-red-600 hover:bg-red-700 text-white px-8 py-3.5 md:py-4 rounded-xl font-black text-sm md:text-base tracking-widest transition-all shadow-lg shadow-red-600/20 whitespace-nowrap flex items-center justify-center gap-2"
+                    >
+                      NEXT STEP <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -445,7 +454,6 @@ export default function BookingFlow() {
 
                 <div className="grid grid-cols-2 gap-4 md:gap-5">
                   <div>
-                    {/* 🚨 UPDATED LABEL: Manufacture Year */}
                     <label className="block text-xs md:text-sm font-bold text-zinc-600 mb-1.5 md:mb-2 uppercase">Manufacture Year</label>
                     <input
                       type="number" placeholder="2020" value={vehicle.manufacture_year}
@@ -456,7 +464,6 @@ export default function BookingFlow() {
                     {errors.manufacture_year && <p className="text-red-600 text-[10px] md:text-xs mt-1">{errors.manufacture_year}</p>}
                   </div>
                   <div>
-                    {/* 🚨 UPDATED LABEL: Current Mileage */}
                     <label className="block text-xs md:text-sm font-bold text-zinc-600 mb-1.5 md:mb-2 uppercase">Current Mileage (km)</label>
                     <input
                       type="number" placeholder="85000" value={vehicle.mileage}
@@ -481,7 +488,7 @@ export default function BookingFlow() {
 
               <div className="flex gap-3 md:gap-4 mt-6 md:mt-10">
                 <button onClick={() => setStep(step - 1)} className="w-1/3 border border-zinc-300 py-3 md:py-4 rounded-xl font-bold text-zinc-600 text-sm md:text-base hover:bg-zinc-50">BACK</button>
-                <button onClick={goToNextStep} className="w-2/3 bg-red-600 hover:bg-red-700 text-white py-3 md:py-4 rounded-xl font-bold text-sm md:text-base tracking-wider shadow-md">NEXT: DATE & TIME →</button>
+                <button onClick={goToNextStep} className="w-2/3 bg-red-600 hover:bg-red-700 text-white py-3 md:py-4 rounded-xl font-black text-sm md:text-base tracking-widest shadow-md">NEXT: SCHEDULE →</button>
               </div>
             </div>
           )}
@@ -496,6 +503,7 @@ export default function BookingFlow() {
                   <select
                     value={slot.date} onChange={handleDateChange}
                     className={`w-full bg-white border text-zinc-900 p-3 md:p-4 rounded-xl focus:outline-none appearance-none text-sm md:text-base ${errors.date ? 'border-red-500' : 'border-zinc-200 focus:border-red-600'}`}
+                    style={{ backgroundImage: `url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2371717a' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 1rem center', backgroundSize: '1.25em' }}
                   >
                     <option value="">Select a date...</option>
                     {getAvailableDates.map((date) => <option key={date.value} value={date.value}>{date.label}</option>)}
@@ -539,7 +547,7 @@ export default function BookingFlow() {
 
               <div className="flex gap-3 md:gap-4 mt-6 md:mt-10">
                 <button onClick={() => setStep(step - 1)} className="w-1/3 border border-zinc-300 py-3 md:py-4 rounded-xl font-bold text-zinc-600 text-sm md:text-base hover:bg-zinc-50">BACK</button>
-                <button onClick={goToNextStep} className="w-2/3 bg-red-600 hover:bg-red-700 text-white py-3 md:py-4 rounded-xl font-bold text-sm md:text-base tracking-wider shadow-md">NEXT: PAYMENT →</button>
+                <button onClick={goToNextStep} className="w-2/3 bg-red-600 hover:bg-red-700 text-white py-3 md:py-4 rounded-xl font-black text-sm md:text-base tracking-widest shadow-md">NEXT: PAYMENT →</button>
               </div>
             </div>
           )}
@@ -572,13 +580,13 @@ export default function BookingFlow() {
                   <div className="mt-3 md:mt-4 p-4 md:p-5 bg-zinc-50 border border-zinc-200 rounded-xl">
                     <p className="text-xs md:text-sm font-bold text-zinc-800 mb-2">Bank: Commercial Bank</p>
                     <p className="text-xs md:text-sm text-zinc-600 mb-1">Acc Name: Royal Service Center</p>
-                    <p className="text-xs md:text-sm text-zinc-600 mb-3">Acc No: 1234567890</p>
+                    <p className="text-xs md:text-sm text-zinc-600 mb-3">Acc No: 8024746928</p>
                     
                     <label className="block text-xs md:text-sm font-bold text-zinc-800 mb-2">Upload Slip</label>
-                    <label htmlFor="dropzone-file" className="flex flex-col items-center justify-center w-full h-24 md:h-32 border-2 border-zinc-300 border-dashed rounded-lg cursor-pointer bg-white hover:bg-zinc-50">
+                    <label htmlFor="dropzone-file" className="flex flex-col items-center justify-center w-full h-24 md:h-32 border-2 border-zinc-300 border-dashed rounded-lg cursor-pointer bg-white hover:bg-zinc-50 transition-colors">
                       <div className="flex flex-col items-center justify-center pt-3 pb-4">
                         <svg className="w-6 h-6 md:w-8 md:h-8 mb-2 text-zinc-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" /></svg>
-                        <p className="text-[10px] md:text-xs text-zinc-500 font-semibold">{paymentSlip ? paymentSlip.name : 'Click to upload'}</p>
+                        <p className="text-[10px] md:text-xs text-zinc-500 font-semibold">{paymentSlip ? paymentSlip.name : 'Click to upload slip'}</p>
                       </div>
                       <input id="dropzone-file" type="file" className="hidden" accept="image/*,application/pdf" onChange={handleSlipChange} />
                     </label>
@@ -598,7 +606,7 @@ export default function BookingFlow() {
                   </div>
                   <div className="flex justify-between border-b border-zinc-200 pb-2 md:pb-4">
                     <span className="text-zinc-500 font-bold uppercase text-[10px] md:text-xs">Price</span>
-                    <span className="text-red-600 font-black">LKR {getPrice(selectedService).toLocaleString()}</span>
+                    <span className="text-red-600 font-black text-base md:text-lg">LKR {getPrice(selectedService).toLocaleString()}</span>
                   </div>
                   <div className="flex justify-between border-b border-zinc-200 pb-2 md:pb-4">
                     <span className="text-zinc-500 font-bold uppercase text-[10px] md:text-xs">Vehicle</span>
@@ -617,7 +625,7 @@ export default function BookingFlow() {
                   {issueDescription && (
                     <div className="flex justify-between">
                       <span className="text-zinc-500 font-bold uppercase text-[10px] md:text-xs">Notes</span>
-                      <p className="text-[10px] md:text-xs text-zinc-700 bg-white p-2 rounded border text-left max-w-[200px] md:max-w-xs">{issueDescription}</p>
+                      <p className="text-[10px] md:text-xs text-zinc-700 bg-white p-2 rounded border text-left max-w-[200px] md:max-w-xs break-words">{issueDescription}</p>
                     </div>
                   )}
                 </div>
@@ -627,9 +635,13 @@ export default function BookingFlow() {
                 <button onClick={() => setStep(step - 1)} disabled={isSubmitting} className="w-1/3 border border-zinc-300 py-3 md:py-4 rounded-xl font-bold text-zinc-600 text-sm md:text-base hover:bg-zinc-50">BACK</button>
                 <button
                   disabled={isSubmitting} onClick={handleSubmitBooking}
-                  className="w-2/3 bg-red-600 hover:bg-red-700 text-white py-3 md:py-4 rounded-xl font-black text-sm md:text-base tracking-widest shadow-md flex items-center justify-center gap-2"
+                  className="w-2/3 bg-red-600 hover:bg-red-700 text-white py-3 md:py-4 rounded-xl font-black text-sm md:text-base tracking-widest shadow-md flex items-center justify-center gap-2 transition-all"
                 >
-                  {isSubmitting ? 'PROCESSING...' : 'CONFIRM'}
+                  {isSubmitting ? (
+                    <><div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-white"></div> PROCESSING...</>
+                  ) : (
+                    'CONFIRM BOOKING'
+                  )}
                 </button>
               </div>
             </div>
@@ -637,23 +649,32 @@ export default function BookingFlow() {
 
           {/* STEP 5 */}
           {step === 5 && (
-            <div className="text-center py-8 md:py-12">
-              <div className="w-16 h-16 md:w-20 md:h-20 bg-red-50 border-2 border-red-600 text-red-600 rounded-full flex items-center justify-center mx-auto mb-4 md:mb-6">
+            <div className="text-center py-8 md:py-12 animate-[fadeIn_0.5s_ease-out]">
+              <div className="w-16 h-16 md:w-20 md:h-20 bg-green-50 border-2 border-green-500 text-green-500 rounded-full flex items-center justify-center mx-auto mb-4 md:mb-6">
                 <svg className="w-8 h-8 md:w-10 md:h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" /></svg>
               </div>
               <h3 className="text-xl md:text-3xl font-black text-zinc-900 uppercase">Confirmed!</h3>
               <p className="text-zinc-600 mt-2 text-sm md:text-lg">Your reference number is</p>
-              <div className="inline-block bg-zinc-50 border-2 border-red-600/30 rounded-xl px-4 md:px-8 py-2 md:py-4 mt-3 md:mt-4">
+              <div className="inline-block bg-zinc-50 border-2 border-red-600/30 rounded-xl px-4 md:px-8 py-2 md:py-4 mt-3 md:mt-4 shadow-sm">
                 <strong className="text-xl md:text-3xl text-zinc-900 tracking-widest font-black">{successRef}</strong>
               </div>
-              <div className="flex flex-col sm:flex-row gap-3 md:gap-4 justify-center mt-6 md:mt-10">
-                <button onClick={() => navigate('/dashboard')} className="bg-red-600 text-white px-6 md:px-8 py-3 rounded-xl font-bold text-sm md:text-base shadow-md">DASHBOARD</button>
-                <button onClick={() => navigate('/')} className="bg-zinc-900 text-white px-6 md:px-8 py-3 rounded-xl font-bold text-sm md:text-base">HOME</button>
+              <p className="text-xs text-zinc-400 mt-4 max-w-sm mx-auto">Please save this reference number. You can track your booking status in your dashboard.</p>
+              
+              <div className="flex flex-col sm:flex-row gap-3 md:gap-4 justify-center mt-8 md:mt-10">
+                <button onClick={() => navigate('/dashboard')} className="bg-red-600 hover:bg-red-700 transition-colors text-white px-6 md:px-8 py-3.5 rounded-xl font-bold text-sm md:text-base shadow-md">GO TO DASHBOARD</button>
+                <button onClick={() => navigate('/')} className="bg-zinc-900 hover:bg-zinc-800 transition-colors text-white px-6 md:px-8 py-3.5 rounded-xl font-bold text-sm md:text-base">BACK TO HOME</button>
               </div>
             </div>
           )}
         </div>
       </div>
+      
+      <style dangerouslySetInnerHTML={{__html: `
+        .scrollbar-hide::-webkit-scrollbar { display: none; }
+        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+        @keyframes slideUp { from { transform: translateY(100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+      `}} />
     </div>
   );
 }

@@ -47,9 +47,41 @@ export default function CustomerDashboard() {
     }
   };
 
+  const isTimeSlotInPast = (date, time) => {
+    if (!date || !time) return false;
+    const now = new Date();
+    const today = now.toISOString().split('T')[0];
+    if (date > today) return false;
+    if (date < today) return true;
+    
+    const [timeStr, period] = time.split(' ');
+    const [hours, minutes] = timeStr.split(':').map(Number);
+    let hour24 = hours;
+    
+    if (period === 'PM' && hours !== 12) hour24 += 12;
+    if (period === 'AM' && hours === 12) hour24 = 0;
+    
+    const slotDateTime = new Date();
+    slotDateTime.setHours(hour24, minutes, 0, 0);
+    return slotDateTime < now;
+  };
+
+  const getComputedStatus = (booking) => {
+    if (['Cancelled', 'Rejected', 'Completed'].includes(booking.status)) {
+      return booking.status;
+    }
+    
+    if (['Pending', 'Confirmed'].includes(booking.status) && isTimeSlotInPast(booking.booking_date, booking.booking_time)) {
+      return 'Cancelled';
+    }
+    
+    return booking.status;
+  };
+
   const canCancelBooking = (booking) => {
     if (!booking.booking_date || !booking.booking_time) return false;
-    if (!['Pending', 'Confirmed'].includes(booking.status)) return false;
+    const currentStatus = getComputedStatus(booking);
+    if (!['Pending', 'Confirmed'].includes(currentStatus)) return false;
 
     const now = new Date();
     const [timeStr, period] = booking.booking_time.split(' ');
@@ -67,6 +99,11 @@ export default function CustomerDashboard() {
   };
 
   const getCancellationMessage = (booking) => {
+    const currentStatus = getComputedStatus(booking);
+    if (currentStatus === 'Cancelled' && ['Pending', 'Confirmed'].includes(booking.status)) {
+       return 'Booking time has passed';
+    }
+
     const now = new Date();
     const [timeStr, period] = booking.booking_time.split(' ');
     const [hours, minutes] = timeStr.split(':').map(Number);
@@ -189,23 +226,33 @@ export default function CustomerDashboard() {
 
   const getStatusCount = (status) => {
     if (status === 'All') return bookings.length;
-    if (status === 'Upcoming') {
-      return bookings.filter((b) => b.status === 'Pending' || b.status === 'Confirmed').length;
-    }
-    return bookings.filter((b) => b.status === status).length;
+    
+    return bookings.filter((b) => {
+      const computedStatus = getComputedStatus(b);
+      if (status === 'Upcoming') {
+        return computedStatus === 'Pending' || computedStatus === 'Confirmed';
+      }
+      if (status === 'Cancelled') {
+        return computedStatus === 'Cancelled' || computedStatus === 'Rejected';
+      }
+      return computedStatus === status;
+    }).length;
   };
 
   const filteredBookings = useMemo(() => {
-    let filtered = bookings;
+    let filtered = bookings.map(b => ({
+      ...b,
+      displayStatus: getComputedStatus(b)
+    }));
 
     if (activeTab === 'Upcoming') {
-      filtered = filtered.filter((b) => b.status === 'Pending' || b.status === 'Confirmed');
+      filtered = filtered.filter((b) => b.displayStatus === 'Pending' || b.displayStatus === 'Confirmed');
     } else if (activeTab === 'In Progress') {
-      filtered = filtered.filter((b) => b.status === 'In Progress');
+      filtered = filtered.filter((b) => b.displayStatus === 'In Progress');
     } else if (activeTab === 'Completed') {
-      filtered = filtered.filter((b) => b.status === 'Completed');
+      filtered = filtered.filter((b) => b.displayStatus === 'Completed');
     } else if (activeTab === 'Cancelled') {
-      filtered = filtered.filter((b) => b.status === 'Cancelled' || b.status === 'Rejected');
+      filtered = filtered.filter((b) => b.displayStatus === 'Cancelled' || b.displayStatus === 'Rejected');
     }
 
     if (searchTerm) {
@@ -225,8 +272,8 @@ export default function CustomerDashboard() {
         return 3;
       };
 
-      const weightA = getWeight(a.status);
-      const weightB = getWeight(b.status);
+      const weightA = getWeight(a.displayStatus);
+      const weightB = getWeight(b.displayStatus);
 
       if (weightA !== weightB) return weightA - weightB;
 
@@ -446,8 +493,8 @@ export default function CustomerDashboard() {
                 <div className="divide-y divide-zinc-800/50">
                   {currentItems.map((booking) => {
                     const canCancel = canCancelBooking(booking);
-                    const isCompleted = booking.status === 'Completed';
-                    const isActionable = (activeTab === 'Upcoming' || activeTab === 'All') && ['Pending', 'Confirmed'].includes(booking.status);
+                    const isCompleted = booking.displayStatus === 'Completed';
+                    const isActionable = (activeTab === 'Upcoming' || activeTab === 'All') && ['Pending', 'Confirmed'].includes(booking.displayStatus);
 
                     return (
                       <div
@@ -458,8 +505,8 @@ export default function CustomerDashboard() {
                         {/* Left Section: Ref & Status */}
                         <div className="w-full lg:w-48 shrink-0">
                           <div className="font-bold text-white text-sm tracking-wider">{booking.booking_ref}</div>
-                          <div className={`text-xs font-bold uppercase mt-1 ${getStatusStyle(booking.status)}`}>
-                            {booking.status}
+                          <div className={`text-xs font-bold uppercase mt-1 ${getStatusStyle(booking.displayStatus)}`}>
+                            {booking.displayStatus === 'Cancelled' && booking.status !== 'Cancelled' && booking.status !== 'Rejected' ? 'Passed / Cancelled' : booking.displayStatus}
                           </div>
                         </div>
 
