@@ -71,13 +71,8 @@ export default function Chat() {
       const recentBookings = bookings.slice(0, 3).map(b => {
         const date = new Date(b.booking_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
         return `• ${b.service_id?.name || 'Service'} (${date}) - Status: ${b.status}`;
-      }).join('
-');
-      return `Here are your recent bookings:
-
-${recentBookings}
-
-For full details, please visit your Dashboard.`;
+      }).join('\n');
+      return `Here are your recent bookings:\n\n${recentBookings}\n\nFor full details, please visit your Dashboard.`;
     } catch (error) {
       return "I'm having trouble accessing your booking data right now. Please try again later or check your Dashboard.";
     }
@@ -91,13 +86,8 @@ For full details, please visit your Dashboard.`;
       const priceList = services.slice(0, 6).map(s => {
         let priceStr = typeof s.price === 'number' ? `LKR ${s.price.toLocaleString()}` : s.price?.Car ? `From LKR ${s.price.Car.toLocaleString()}` : 'Contact for price';
         return `• ${s.name}: ${priceStr}`;
-      }).join('
-');
-      return `💰 Our Current Service Prices:
-
-${priceList}
-
-*Prices vary based on vehicle type (Car, SUV, Van). For exact pricing, please visit the Booking page!*`;
+      }).join('\n');
+      return `💰 Our Current Service Prices:\n\n${priceList}\n\n*Prices vary based on vehicle type (Car, SUV, Van). For exact pricing, please visit the Booking page!*`;
     } catch (error) {
       return "I'm having trouble accessing our pricing right now. Please try again later or visit the booking page.";
     }
@@ -107,63 +97,15 @@ ${priceList}
     const q = question.toLowerCase();
     if (q.includes('status') || q.includes('track') || q.includes('check')) return await fetchRealBookingStatus();
     if (q.includes('price') || q.includes('cost') || q.includes('pricing') || q.includes('fee')) return await fetchRealPricing();
-    if (q.includes('cancel') || q.includes('cancellation')) return `❌ How to Cancel a Booking:
-
-1. Go to your Dashboard
-2. Navigate to "Upcoming" bookings
-3. Find the booking you want to cancel
-4. Click the "CANCEL" button
-5. Confirm your cancellation
-
-⚠️ Important: Cancellations must be made at least 2 hours before your appointment time.`;
-    if (/\b(book|booking|appointment|schedule)\b/.test(q)) return `📅 How to Book an Appointment:
-
-1. Click on "NEW BOOKING" button on the dashboard
-2. Select your vehicle type (Car, SUV, or Van)
-3. Choose the service you need
-4. Enter your vehicle details (Registration number, Make, Model, Year, Mileage)
-5. Select a convenient date and time slot
-6. Review your booking and confirm
-
-✅ Your booking will be confirmed instantly with a reference number.
-
-Note: You can book up to 7 days in advance.`;
-    if (q.includes('contact') || q.includes('phone') || q.includes('number') || q.includes('call')) return `📞 Our Contact Information:
-
-Phone: +94 74 365 8500
-Email: admin@royalservice.tech
-
-Our support team is available during operating hours.`;
-    if (q.includes('service') || q.includes('offer') || q.includes('provide')) return `🔧 Our Services:
-
-1. Full Service
-2. Oil Change
-3. Brake Service
-4. AC Service
-5. Tire Service
-6. Engine Diagnostics
-7. Battery Service
-8. Wash & Detailing
-
-Prices vary based on vehicle type.`;
-    if (q.includes('hour') || q.includes('open') || q.includes('time') || q.includes('close')) return `🕒 Operating Hours:
-
-Monday - Friday: 8:00 AM - 6:00 PM
-Saturday: 9:00 AM - 4:00 PM
-Sunday: Closed
-
-Last booking slot is at 3:30 PM.`;
-    if (q.includes('location') || q.includes('where') || q.includes('address')) return `📍 Our Location:
-
-Royal Service Center
-13/5 Service Road,
-Colombo 05,
-Sri Lanka`;
+    if (q.includes('cancel') || q.includes('cancellation')) return `❌ How to Cancel a Booking:\n\n1. Go to your Dashboard\n2. Navigate to "Upcoming" bookings\n3. Find the booking you want to cancel\n4. Click the "CANCEL" button\n5. Confirm your cancellation\n\n⚠️ Important: Cancellations must be made at least 2 hours before your appointment time.`;
+    if (/\b(book|booking|appointment|schedule)\b/.test(q)) return `📅 How to Book an Appointment:\n\n1. Click on "NEW BOOKING" button on the dashboard\n2. Select your vehicle type (Car, SUV, or Van)\n3. Choose the service you need\n4. Enter your vehicle details (Registration number, Make, Model, Year, Mileage)\n5. Select a convenient date and time slot\n6. Review your booking and confirm\n\n✅ Your booking will be confirmed instantly with a reference number.\n\nNote: You can book up to 7 days in advance.`;
+    if (q.includes('contact') || q.includes('phone') || q.includes('number') || q.includes('call')) return `📞 Our Contact Information:\n\nPhone: +94 74 365 8500\nEmail: admin@royalservice.tech\n\nOur support team is available during operating hours.`;
+    if (q.includes('service') || q.includes('offer') || q.includes('provide')) return `🔧 Our Services:\n\n1. Full Service\n2. Oil Change\n3. Brake Service\n4. AC Service\n5. Tire Service\n6. Engine Diagnostics\n7. Battery Service\n8. Wash & Detailing\n\nPrices vary based on vehicle type.`;
+    if (q.includes('hour') || q.includes('open') || q.includes('time') || q.includes('close')) return `🕒 Operating Hours:\n\nMonday - Friday: 8:00 AM - 6:00 PM\nSaturday: 9:00 AM - 4:00 PM\nSunday: Closed\n\nLast booking slot is at 3:30 PM.`;
+    if (q.includes('location') || q.includes('where') || q.includes('address')) return `📍 Our Location:\n\nRoyal Service Center\n13/5 Service Road,\nColombo 05,\nSri Lanka`;
     if (q.includes('thank') || q.includes('thanks')) return `You're welcome! 😊 Is there anything else I can help you with?`;
     if (q.includes('hello') || q.includes('hi') || q.includes('hey')) return `Hello! 👋 Welcome to Royal Service Center. How can I assist you today?`;
-    return `Thank you for your message! I'll help you with that.
-
-For immediate assistance, call us at +94 74 365 8500 or email admin@royalservice.tech.`;
+    return `Thank you for your message! I'll help you with that.\n\nFor immediate assistance, call us at +94 74 365 8500 or email admin@royalservice.tech.`;
   };
 
   // Add messages received from the server only once.
@@ -324,7 +266,7 @@ For immediate assistance, call us at +94 74 365 8500 or email admin@royalservice
         markReadTimeoutRef.current = setTimeout(() => {
           socket.emit('mark_read', { threadId: newMessage.threadId, userId });
           setFirstUnreadId(null); 
-        }, 1000); // 🚨 UPDATED TO 1 SECOND
+        }, 1000); // 🚨 SET TO 1 SECOND
         
       } else if (isAdminOrStaff) {
         toast.success(`New message from ${newMessage.senderName}`);
@@ -434,7 +376,7 @@ For immediate assistance, call us at +94 74 365 8500 or email admin@royalservice
           return updated;
         });
         setFirstUnreadId(null); 
-      }, 1000); // 🚨 UPDATED TO 1 SECOND
+      }, 1000); // 🚨 SET TO 1 SECOND
     }
 
     setIsMobileChatOpen(true);
@@ -495,15 +437,7 @@ For immediate assistance, call us at +94 74 365 8500 or email admin@royalservice
       setTimeout(() => {
         socket.emit('send_message', {
           senderId: 'bot', senderName: 'Royal Service Center', senderRole: 'bot', threadId: userId,
-          text: `Thank you for your message! I'll help you with that.
-
-You can also use these quick commands:
-• Ask about booking appointments
-• Inquire about our services
-• Get our contact number
-• Check operating hours
-
-For immediate assistance, call us at +94 74 365 8500 or email admin@royalservice.tech.`
+          text: `Thank you for your message! I'll help you with that.\n\nYou can also use these quick commands:\n• Ask about booking appointments\n• Inquire about our services\n• Get our contact number\n• Check operating hours\n\nFor immediate assistance, call us at +94 74 365 8500 or email admin@royalservice.tech.`
         });
       }, 1000);
     }
